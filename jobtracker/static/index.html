@@ -1,0 +1,1574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' fill='%23e30613'/></svg>">
+<style>
+/* Swiss: white, black and one red. Grid, rules and big numbers instead of boxes and shadows. */
+:root {
+  --bg: #ffffff; --ink: #000000; --muted: #666666; --faint: #9a9a9a; --rule: #dcdcdc;
+  --hover: #f5f5f5; --sel: #efefef; --accent: #e30613; --accent-ink: #ffffff; --ok: #000000;
+  --s-applied: #000000; --s-screening: #000000; --s-interview: #e30613; --s-offer: #e30613;
+  --s-rejected: #9a9a9a; --s-ghosted: #b8b8b8; --s-withdrawn: #b8b8b8; --s-other: #666666;
+  --k-note: #9a9a9a; --k-interview: #e30613; --k-call: #000000; --k-email: #000000;
+  --k-status: #666666; --k-other: #9a9a9a; --k-applied: #000000;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .18);
+  --font: "Helvetica Neue", Helvetica, Arial, "Nimbus Sans", "Liberation Sans", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0a0a; --ink: #f2f2f2; --muted: #a0a0a0; --faint: #6e6e6e; --rule: #2a2a2a;
+    --hover: #161616; --sel: #1d1d1d; --accent: #ff2d2d; --ok: #f2f2f2;
+    --s-applied: #f2f2f2; --s-screening: #f2f2f2; --s-interview: #ff2d2d; --s-offer: #ff2d2d;
+    --s-rejected: #7a7a7a; --s-ghosted: #5c5c5c; --s-withdrawn: #5c5c5c; --s-other: #a0a0a0;
+    --k-note: #7a7a7a; --k-interview: #ff2d2d; --k-call: #f2f2f2; --k-email: #f2f2f2;
+    --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2;
+    --shadow: 0 18px 50px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0a0a; --ink: #f2f2f2; --muted: #a0a0a0; --faint: #6e6e6e; --rule: #2a2a2a;
+  --hover: #161616; --sel: #1d1d1d; --accent: #ff2d2d; --ok: #f2f2f2;
+  --s-applied: #f2f2f2; --s-screening: #f2f2f2; --s-interview: #ff2d2d; --s-offer: #ff2d2d;
+  --s-rejected: #7a7a7a; --s-ghosted: #5c5c5c; --s-withdrawn: #5c5c5c; --s-other: #a0a0a0;
+  --k-note: #7a7a7a; --k-interview: #ff2d2d; --k-call: #f2f2f2; --k-email: #f2f2f2;
+  --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.4 var(--font); }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; }
+kbd { font: 700 10px/1 var(--font); padding: 2px 4px; border: 1px solid currentColor; vertical-align: 1px; }
+.muted { color: var(--muted); }
+
+.btn {
+  border: 2px solid var(--ink); background: transparent; padding: 6px 12px; cursor: pointer;
+  white-space: nowrap; font-weight: 700; border-radius: 0;
+}
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.btn.danger { color: var(--accent); border-color: var(--accent); }
+.btn.danger:hover { background: var(--accent); color: #fff; }
+.btn.small { padding: 3px 9px; font-size: 13px; border-width: 1px; }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.ghost:hover { background: var(--hover); color: var(--ink); }
+.btn.ghost.danger { color: var(--accent); }
+
+input[type=text], input[type=url], input[type=search], input[type=date], input[type=time], select, textarea {
+  border: 0; border-bottom: 1px solid var(--ink); background: transparent; border-radius: 0;
+  padding: 6px 0; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; line-height: 1.4; }
+select { cursor: pointer; }
+input:focus, select:focus, textarea:focus { outline: none; border-bottom: 2px solid var(--accent); margin-bottom: -1px; }
+.btn:focus-visible, .chip:focus-visible, .stat:focus-visible, .views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input.saved, textarea.saved, select.saved { background: var(--hover); transition: background .3s; }
+input.bad, textarea.bad { border-bottom: 2px solid var(--accent); }
+
+/* top bar */
+.top {
+  position: sticky; top: 0; z-index: 5; display: flex; gap: 14px 24px; align-items: flex-end; flex-wrap: wrap;
+  padding: 24px 32px 14px; background: var(--bg);
+}
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 32px; letter-spacing: -.045em; line-height: .9; white-space: nowrap; }
+.brand::before { content: ""; width: 18px; height: 18px; background: var(--accent); flex: none; }
+.views { display: flex; gap: 18px; }
+.views button { border: 0; background: none; padding: 2px 0; cursor: pointer; color: var(--faint); font-weight: 700; }
+.views button:hover { color: var(--ink); }
+.views button.on { color: var(--ink); box-shadow: inset 0 -3px var(--accent); }
+#search { max-width: 340px; flex: 1 1 180px; border-bottom-width: 2px; padding: 4px 0; }
+.spacer { flex: 1; }
+.menu { position: relative; }
+.menu summary { list-style: none; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu .pop {
+  position: absolute; right: 0; top: calc(100% + 8px); background: var(--bg); border: 2px solid var(--ink);
+  box-shadow: var(--shadow); padding: 6px 0; min-width: 250px; z-index: 20;
+}
+.menu .pop a, .menu .pop button {
+  display: block; width: 100%; text-align: left; padding: 8px 14px; border: 0; background: none;
+  cursor: pointer; color: var(--ink); text-decoration: none; font-weight: 700; font-size: 14px;
+}
+.menu .pop a:hover, .menu .pop button:hover { background: var(--accent); color: #fff; }
+.menu .pop hr { border: 0; border-top: 1px solid var(--rule); margin: 6px 0; }
+
+/* summary, coming up, filters */
+.wrap { padding: 4px 32px 60px; }
+.summary { display: flex; flex-wrap: wrap; border-top: 6px solid var(--ink); margin-bottom: 20px; }
+.stat {
+  display: flex; flex-direction: column; align-items: flex-start; padding: 10px 22px 8px 0; min-width: 86px;
+  border: 0; background: none; cursor: pointer; text-align: left;
+}
+.stat b { font-size: 52px; font-weight: 700; letter-spacing: -.05em; line-height: 1; color: var(--c, var(--ink)); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; font-weight: 700; margin-top: 5px; padding-bottom: 3px; }
+.stat i { display: none; }
+.stat:hover span { color: var(--accent); }
+.stat.on span { box-shadow: inset 0 -3px var(--accent); }
+.stat.sep { margin-left: 4px; padding-left: 22px; border-left: 1px solid var(--rule); }
+.upcoming { border-top: 2px solid var(--ink); margin-bottom: 20px; }
+.upcoming h2 { font-size: 12px; font-weight: 700; margin: 8px 0 2px; }
+.up {
+  display: grid; grid-template-columns: 230px 190px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 10px 0; border-top: 1px solid var(--rule); cursor: pointer;
+}
+.up:first-of-type { border-top: 0; }
+.up:hover { background: var(--hover); }
+.up .when b { display: block; font-size: 19px; letter-spacing: -.02em; }
+.up .when span { font-size: 12px; color: var(--muted); }
+.up .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: flex; gap: 4px 18px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.chip { border: 0; background: none; padding: 4px 0; cursor: pointer; font-weight: 700; color: var(--faint); font-size: 14px; }
+.chip:hover { color: var(--ink); }
+.chip.on { color: var(--ink); box-shadow: inset 0 -3px var(--c, var(--accent)); }
+.chip.clear { color: var(--accent); font-weight: 400; }
+.count { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+/* table */
+.tablewrap { overflow-x: auto; border-top: 2px solid var(--ink); }
+table { width: 100%; border-collapse: collapse; }
+th {
+  position: sticky; top: 0; background: var(--bg); text-align: left; font-size: 11px; font-weight: 700;
+  padding: 8px 10px; border-bottom: 1px solid var(--ink); cursor: pointer; white-space: nowrap; user-select: none;
+}
+th:hover { color: var(--accent); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--hover); }
+tbody tr.sel { background: var(--sel); }
+tbody tr.sel td:first-child { box-shadow: inset 4px 0 var(--accent); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.nowrap { white-space: nowrap; }
+.flag { color: var(--accent); }
+.tag { font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; margin-left: 4px; }
+.tool { display: inline-block; font-size: 13px; color: var(--muted); margin-right: 10px; white-space: nowrap; }
+.stale-badge { font-size: 12px; font-weight: 700; color: var(--accent); margin-left: 6px; }
+.pill { font-weight: 700; font-size: 13px; color: var(--c); white-space: nowrap; }
+.pill::before { content: ""; display: inline-block; width: 9px; height: 9px; background: var(--c); margin-right: 7px; }
+select.st {
+  appearance: none; -webkit-appearance: none; width: auto; border: 0; padding: 2px 16px; font-weight: 700;
+  font-size: 13px; color: var(--c); cursor: pointer;
+  background:
+    linear-gradient(var(--c), var(--c)) 0 50% / 9px 9px no-repeat,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0h8L4 5z' fill='%239a9a9a'/></svg>") right 2px center / 8px 5px no-repeat;
+}
+select.st:hover { text-decoration: underline; }
+select.st:focus { border: 0; margin: 0; outline: 2px solid var(--accent); outline-offset: 2px; }
+select.st option { color: var(--ink); background: var(--bg); }
+.ext { text-decoration: none; margin-left: 4px; font-size: 12px; font-weight: 700; color: var(--accent); }
+.empty { padding: 48px 0; color: var(--muted); }
+.empty .btn { margin: 12px 8px 0 0; }
+.hint {
+  position: fixed; bottom: 0; left: 0; right: 0; padding: 6px 32px; font-size: 12px; color: var(--faint);
+  background: var(--bg); border-top: 1px solid var(--rule);
+}
+
+/* drawer */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(720px, 100vw); z-index: 10;
+  background: var(--bg); border-left: 1px solid var(--rule); border-top: 6px solid var(--accent);
+  box-shadow: var(--shadow); display: flex; flex-direction: column;
+}
+.drawer[hidden] { display: none; }
+.dh { display: flex; gap: 8px; align-items: center; padding: 16px 24px 12px; }
+.dtitle { font-size: 30px !important; font-weight: 700; letter-spacing: -.04em; border-bottom-color: transparent !important; padding: 2px 0 !important; }
+.dtitle:hover { border-bottom-color: var(--rule) !important; }
+.dtitle:focus { border-bottom-color: var(--accent) !important; }
+.dbody { overflow-y: auto; padding: 0 24px 40px; flex: 1; }
+.sec { padding: 12px 0 16px; border-top: 2px solid var(--ink); }
+.sech { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sech h3 { margin: 0; font-size: 12px; font-weight: 700; }
+.fld { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; min-width: 0; }
+.fld > span { font-size: 11px; font-weight: 700; color: var(--muted); }
+.withlink { display: flex; gap: 6px; align-items: center; }
+.withlink a { flex: none; text-decoration: none; color: var(--accent); padding: 2px 4px; font-weight: 700; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 20px; }
+.checks { display: flex; gap: 22px; margin: 2px 0 14px; }
+.check { display: flex; gap: 7px; align-items: center; cursor: pointer; font-weight: 700; font-size: 14px; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.card { border-top: 1px solid var(--rule); padding: 12px 0 8px; }
+.sech + .card { border-top: 0; padding-top: 0; }
+.card.hl { box-shadow: inset 4px 0 var(--accent); padding-left: 14px; }
+.card-h { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+.card-h input { font-weight: 700; font-size: 17px; flex: 1; }
+.card-h select.st { flex: none; }
+.card-f { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+.person { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 10px 0; border-top: 1px solid var(--rule); }
+.sech + .person { border-top: 0; padding-top: 0; }
+.person .grid3 { margin-bottom: 4px; }
+.callout { margin: 4px 0 16px; padding: 12px 14px; background: var(--accent); color: #fff; font-weight: 700; }
+.callout b { color: #fff; }
+.empty-note { color: var(--faint); font-size: 13px; margin: 0; }
+
+/* log */
+.logform { border: 2px solid var(--ink); padding: 12px 14px; margin-bottom: 14px; }
+.tpls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.tpls button { font-size: 12px; font-weight: 700; padding: 3px 9px; border: 1px solid var(--ink); background: none; cursor: pointer; }
+.tpls button:hover { background: var(--ink); color: var(--bg); }
+.logrow { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; align-items: flex-end; }
+.logrow select, .logrow input { width: auto; flex: 1 1 110px; }
+.logrow .btn { flex: none; }
+.tl-group { font-size: 11px; font-weight: 700; color: var(--muted); margin: 16px 0 2px; }
+.ev { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--rule); }
+.tl-group + .ev { border-top: 0; }
+.ev .dot { width: 9px; height: 9px; background: var(--c); margin-top: 5px; }
+.ev.future .dot { outline: 2px solid var(--c); outline-offset: 2px; }
+.evmeta { font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+.evmeta .k { font-weight: 700; color: var(--c); }
+.evbody { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 1px; }
+.evact { display: flex; gap: 2px; opacity: 0; }
+.ev:hover .evact, .ev:focus-within .evact { opacity: 1; }
+.evact button { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 2px 6px; font-size: 12px; font-weight: 700; }
+.evact button:hover { color: var(--accent); }
+.danger-zone { padding-top: 20px; border-top: 2px solid var(--ink); text-align: right; }
+
+/* modal */
+.backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 30; display: flex;
+  align-items: flex-start; justify-content: center; padding: 6vh 16px 16px; overflow-y: auto;
+}
+.modal { background: var(--bg); border-top: 6px solid var(--accent); box-shadow: var(--shadow); width: 100%; max-width: 640px; padding: 20px 24px 24px; }
+.modal.wide { max-width: 1080px; }
+.modal h2 { margin: 0 0 16px; font-size: 30px; letter-spacing: -.04em; line-height: 1; }
+.mhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.mhead h2 { margin: 0; flex: 1; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+.cohint { font-size: 12px; margin: -6px 0 10px; min-height: 16px; color: var(--muted); }
+.cohint b { color: var(--accent); }
+.popular { display: flex; gap: 4px 12px; flex-wrap: wrap; margin: -6px 0 12px; }
+.popular button { font-size: 12px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--muted); font-weight: 700; }
+.popular button:hover { color: var(--accent); }
+.brief-canvas { width: 100%; height: auto; display: block; border: 1px solid var(--rule); }
+.import-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 10px 0; align-items: baseline; }
+.import-stats b { font-variant-numeric: tabular-nums; text-align: right; font-size: 22px; letter-spacing: -.03em; }
+.warnings { max-height: 180px; overflow: auto; font-size: 12px; border-left: 4px solid var(--accent); padding: 6px 10px; }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; align-items: center; }
+
+#toast {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 50;
+  display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none;
+}
+.toast {
+  background: var(--ink); color: var(--bg); padding: 10px 16px; font-weight: 700; box-shadow: var(--shadow);
+  pointer-events: auto; display: flex; gap: 14px; align-items: center;
+}
+.toast.error { background: var(--accent); color: #fff; }
+.toast button { background: none; border: 0; color: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .top { padding: 16px 16px 10px; gap: 12px 16px; }
+  .brand { font-size: 26px; }
+  .wrap { padding: 4px 16px 60px; }
+  .stat { min-width: 64px; padding-right: 14px; }
+  .stat b { font-size: 36px; }
+  .stat.sep { padding-left: 14px; }
+  .grid2, .grid3 { grid-template-columns: 1fr; }
+  .up { grid-template-columns: 1fr; gap: 2px; }
+  .hint { display: none; }
+  #search { max-width: none; order: 10; flex-basis: 100%; }
+  .dh, .dbody { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Job Tracker</div>
+  <div class="views" role="tablist">
+    <button data-view="applications">Applications</button>
+    <button data-view="companies">Companies</button>
+  </div>
+  <input id="search" type="search" placeholder="Search everything  ( / )" autocomplete="off">
+  <div class="spacer"></div>
+  <button id="btn-new" class="btn primary">+ New <kbd>n</kbd></button>
+  <details class="menu" id="menu">
+    <summary class="btn" title="Import, export and more">⋯</summary>
+    <div class="pop">
+      <button data-menu="import">Import from CSV…</button>
+      <hr>
+      <a data-export="companies.csv" download>Export companies (CSV)</a>
+      <a data-export="applications.csv" download>Export applications (CSV)</a>
+      <a data-export="backup.json" download>Full backup (JSON)</a>
+      <hr>
+      <button data-menu="theme">Switch light / dark</button>
+      <button data-menu="keys">Keyboard shortcuts</button>
+    </div>
+  </details>
+</header>
+
+<div class="wrap">
+  <section id="summary" class="summary"></section>
+  <section id="upcoming" class="upcoming" hidden></section>
+  <section id="chips" class="chips"></section>
+  <div class="tablewrap"><table id="grid"><thead></thead><tbody></tbody></table><div id="empty" class="empty" hidden></div></div>
+</div>
+<div class="hint"><kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>b</kbd> brief · <kbd>1</kbd>/<kbd>2</kbd> views · <kbd>Esc</kbd> close · <kbd>?</kbd> help</div>
+
+<aside id="drawer" class="drawer" hidden></aside>
+<input type="file" id="file-import" accept=".csv,text/csv" hidden>
+<datalist id="co-list"></datalist>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Colours are CSS variables so the dark theme can swap them (see --s-* and --k-* in the styles).
+const STATUS_VARS = { Applied: "applied", Screening: "screening", Interview: "interview", Offer: "offer", Rejected: "rejected", Ghosted: "ghosted", Withdrawn: "withdrawn" };
+const statusColor = s => `var(--s-${STATUS_VARS[s] || "other"})`;
+const REMOTE = { "": "—", remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
+const KINDS = { note: "Note", interview: "Interview", call: "Call / chat", email: "Email", status: "Status", other: "Other", applied: "Applied" };
+const kindColor = k => `var(--k-${["note", "interview", "call", "email", "status", "applied"].includes(k) ? k : "other"})`;
+const TEMPLATES = {
+  interview: { kind: "interview", body: "Online interview with ", label: "Interview scheduled" },
+  talked: { kind: "call", body: "Talked to ", label: "Talked to…", today: true },
+  followup: { kind: "email", body: "Sent a follow-up email", label: "Sent follow-up", today: true },
+  reply: { kind: "email", body: "Heard back: ", label: "Heard back", today: true },
+  note: { kind: "note", body: "", label: "Note" },
+};
+
+function store(key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem("jt." + key);
+    localStorage.setItem("jt." + key, value);
+  } catch { return null; }
+}
+
+const S = {
+  data: null, view: store("view") === "companies" ? "companies" : "applications",
+  filters: new Set(), status: null, q: "", rows: [], sel: -1, open: null,
+  sort: { applications: { key: "applied", dir: -1 }, companies: { key: "activity", dir: -1 } },
+};
+
+// ---------- data -------------------------------------------------------------------------------
+
+async function api(method, path, body) {
+  const opts = { method, headers: { "X-Token": TOKEN } };
+  if (body !== undefined) {
+    opts.body = typeof body === "string" ? body : JSON.stringify(body);
+    opts.headers["Content-Type"] = typeof body === "string" ? "text/plain" : "application/json";
+  }
+  let res;
+  try { res = await fetch(path, opts); }
+  catch { throw new Error("Can't reach the tracker. Is `jobs` still running?"); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function reload() {
+  S.data = await api("GET", "/api/data");
+  index();
+}
+
+function group(rows) {
+  const m = new Map();
+  for (const r of rows) { if (!m.has(r.company_id)) m.set(r.company_id, []); m.get(r.company_id).push(r); }
+  return m;
+}
+
+function index() {
+  const d = S.data;
+  S.co = new Map(d.companies.map(c => [c.id, c]));
+  S.appsBy = group(d.applications);
+  S.eventsBy = group(d.events);
+  S.peopleBy = group(d.contacts);
+  $("#co-list").innerHTML = d.companies.map(c => `<option value="${esc(c.name)}">`).join("");
+}
+
+function replaceRow(table, row) {
+  const list = S.data[table];
+  const i = list.findIndex(r => r.id === row.id);
+  if (i >= 0) list[i] = row; else list.push(row);
+  index();
+}
+const findRow = (table, id) => S.data[table].find(r => r.id === id);
+
+// ---------- dates & derived values -------------------------------------------------------------
+
+const dayNum = s => s ? Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5 : null;
+const daysSince = s => s ? dayNum(S.data.today) - dayNum(s) : null;
+const asDate = s => new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+function fmtDate(s, opts = {}) {
+  if (!s) return "";
+  const d = asDate(s), year = d.getFullYear() !== +S.data.today.slice(0, 4) || opts.year;
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}), ...(opts.weekday ? { weekday: "short" } : {}) });
+}
+function ago(n) {
+  if (n == null) return "";
+  if (n === 0) return "today";
+  if (n === 1) return "yesterday";
+  if (n === -1) return "tomorrow";
+  if (n < 0) return `in ${-n} days`;
+  if (n < 14) return `${n} days ago`;
+  if (n < 60) return `${Math.floor(n / 7)} weeks ago`;
+  return `${Math.floor(n / 30)} months ago`;
+}
+const evDate = e => e.event_date || e.created_at.slice(0, 10);
+const byWhen = (x, y) => (x.event_date + (x.event_time || "99")).localeCompare(y.event_date + (y.event_time || "99"));
+const coApps = cid => S.appsBy.get(cid) || [];
+const coEvents = cid => S.eventsBy.get(cid) || [];
+// Upcoming: a future date, or today when it's an interview or its time hasn't passed yet.
+function isUpcoming(e) {
+  if (!e.event_date || e.event_date < S.data.today) return false;
+  if (e.event_date > S.data.today) return true;
+  const now = new Date().toTimeString().slice(0, 5);
+  return e.kind === "interview" || (!!e.event_time && e.event_time >= now);
+}
+const upcomingFor = cid => coEvents(cid).filter(isUpcoming).sort(byWhen);
+const latestApp = cid => coApps(cid).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id)[0];
+const isActive = a => S.data.config.active_statuses.includes(a.status);
+const splitTools = s => (s || "").split(",").map(t => t.trim()).filter(Boolean);
+
+function appActivity(a) {
+  let last = a.date_applied || a.created_at.slice(0, 10);
+  for (const e of coEvents(a.company_id)) {
+    if (e.application_id && e.application_id !== a.id) continue;
+    const d = evDate(e);
+    if (d <= S.data.today && d > last) last = d;
+  }
+  return last;
+}
+function isStale(a) {
+  const cfg = S.data.config;
+  if (!cfg.stale_statuses.includes(a.status) || upcomingFor(a.company_id).length) return false;
+  return daysSince(appActivity(a)) > cfg.stale_days;
+}
+function coActivity(cid) {
+  let last = "";
+  for (const a of coApps(cid)) { const d = appActivity(a); if (d > last) last = d; }
+  for (const e of coEvents(cid)) { const d = evDate(e); if (d <= S.data.today && d > last) last = d; }
+  return last || S.co.get(cid).created_at.slice(0, 10);
+}
+function statusOptions(current) {
+  const list = [...S.data.config.statuses];
+  if (current && !list.includes(current)) list.push(current);
+  return `<option value="">—</option>` + list.map(s => `<option ${s === current ? "selected" : ""}>${esc(s)}</option>`).join("");
+}
+const statusSelect = (a, extra = "") =>
+  `<select class="st" data-status="${a.id}" style="--c:${statusColor(a.status)}" ${extra}>${statusOptions(a.status)}</select>`;
+const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
+const href = url => /^https?:\/\//i.test(url) ? url : "https://" + url;
+
+// ---------- main view --------------------------------------------------------------------------
+
+const FILTERS = {
+  urgent: { label: "★ Urgent", co: c => c.urgent },
+  remote: { label: "Remote", co: c => c.remote === "remote" },
+  bigtech: { label: "Big tech", co: c => c.is_big_tech },
+  active: { label: "Active", app: isActive, cos: cid => coApps(cid).some(isActive) },
+  stale: { label: "Needs a follow-up", app: isStale, cos: cid => coApps(cid).some(isStale) },
+  notapplied: { label: "Not applied yet", only: "companies", cos: cid => !coApps(cid).length },
+};
+
+const COLS = {
+  applications: [
+    { key: "urgent", label: "★", get: r => r.c.urgent ? 1 : 0, cell: r => r.c.urgent ? `<span class="flag" title="Urgent">★</span>` : "" },
+    { key: "company", label: "Company", get: r => r.c.name.toLowerCase(),
+      cell: r => `<b>${esc(r.c.name)}</b>${r.c.is_big_tech ? ` <span class="tag">Big tech</span>` : ""}` },
+    { key: "position", label: "Position", get: r => r.a.position.toLowerCase(),
+      cell: r => esc(r.a.position || "—") + (r.a.job_url ? `<a class="ext" href="${esc(href(r.a.job_url))}" target="_blank" rel="noopener" title="Open job post">↗</a>` : "") },
+    { key: "status", label: "Status", get: r => { const i = S.data.config.statuses.indexOf(r.a.status); return i < 0 ? 99 : i; }, cell: r => statusSelect(r.a) },
+    { key: "applied", label: "Applied", cls: "nowrap", get: r => r.a.date_applied || "", cell: r => fmtDate(r.a.date_applied) },
+    { key: "days", label: "Days", cls: "num", get: r => daysSince(r.a.date_applied) ?? -1, cell: r => daysSince(r.a.date_applied) ?? "" },
+    { key: "tools", label: "Tools", get: r => r.a.tools.toLowerCase(), cell: r => toolChips(r.a.tools, 4) },
+    { key: "remote", label: "Remote", get: r => r.c.remote, cell: r => REMOTE[r.c.remote] ?? esc(r.c.remote) },
+    { key: "activity", label: "Last activity", cls: "nowrap", get: r => appActivity(r.a),
+      cell: r => ago(daysSince(appActivity(r.a))) + (isStale(r.a) ? `<span class="stale-badge" title="No activity for over ${S.data.config.stale_days} days">follow up</span>` : "") },
+  ],
+  companies: [
+    { key: "urgent", label: "★", get: r => r.c.urgent ? 1 : 0, cell: r => r.c.urgent ? `<span class="flag" title="Urgent">★</span>` : "" },
+    { key: "company", label: "Company", get: r => r.c.name.toLowerCase(),
+      cell: r => `<b>${esc(r.c.name)}</b>${r.c.is_big_tech ? ` <span class="tag">Big tech</span>` : ""}` +
+        (r.c.website ? ` <a class="ext" href="${esc(href(r.c.website))}" target="_blank" rel="noopener">${esc(host(r.c.website))} ↗</a>` : "") },
+    { key: "remote", label: "Remote", get: r => r.c.remote, cell: r => REMOTE[r.c.remote] ?? esc(r.c.remote) },
+    { key: "apps", label: "Apps", cls: "num", get: r => coApps(r.c.id).length, cell: r => coApps(r.c.id).length || "" },
+    { key: "status", label: "Latest", get: r => latestApp(r.c.id)?.status || "",
+      cell: r => { const a = latestApp(r.c.id); return a ? `<span class="pill" style="--c:${statusColor(a.status)}">${esc(a.status || "—")}</span> <span class="muted">${esc(a.position)}</span>` : `<span class="muted">not applied</span>`; } },
+    { key: "next", label: "Coming up", cls: "nowrap", get: r => upcomingFor(r.c.id)[0]?.event_date || "~",
+      cell: r => { const e = upcomingFor(r.c.id)[0]; return e ? `${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " " + e.event_time : ""}` : ""; } },
+    { key: "activity", label: "Last activity", cls: "nowrap", get: r => coActivity(r.c.id),
+      cell: r => ago(daysSince(coActivity(r.c.id))) + (coApps(r.c.id).some(isStale) ? `<span class="stale-badge">follow up</span>` : "") },
+  ],
+};
+
+function toolChips(tools, max = 99) {
+  const list = splitTools(tools);
+  const shown = list.slice(0, max).map(t => `<span class="tool">${esc(t)}</span>`).join("");
+  return shown + (list.length > max ? `<span class="muted"> +${list.length - max}</span>` : "");
+}
+
+function haystack(c, a) {
+  const people = (S.peopleBy.get(c.id) || []).map(p => `${p.name} ${p.role} ${p.notes}`);
+  const parts = [c.name, c.website, c.about, c.notes, c.refs, ...people];
+  const apps = a ? [a] : coApps(c.id);
+  for (const x of apps) parts.push(x.position, x.tools, x.status, x.comments, x.responsibilities, x.offer);
+  return parts.join(" ").toLowerCase();
+}
+
+function buildRows() {
+  const words = S.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const f = [...S.filters].map(k => FILTERS[k]).filter(x => !x.only || x.only === S.view);
+  let rows;
+  if (S.view === "applications") {
+    rows = S.data.applications.map(a => ({ a, c: S.co.get(a.company_id) })).filter(r =>
+      f.every(x => x.co ? x.co(r.c) : x.app ? x.app(r.a) : true) &&
+      (!S.status || r.a.status === S.status) &&
+      (!words.length || (h => words.every(w => h.includes(w)))(haystack(r.c, r.a))));
+  } else {
+    rows = S.data.companies.map(c => ({ c })).filter(r =>
+      f.every(x => x.co ? x.co(r.c) : x.cos ? x.cos(r.c.id) : true) &&
+      (!S.status || coApps(r.c.id).some(a => a.status === S.status)) &&
+      (!words.length || (h => words.every(w => h.includes(w)))(haystack(r.c))));
+  }
+  const { key, dir } = S.sort[S.view];
+  const col = COLS[S.view].find(c => c.key === key);
+  rows.sort((x, y) => {
+    const a = col.get(x), b = col.get(y);
+    return (a < b ? -1 : a > b ? 1 : 0) * dir || x.c.name.localeCompare(y.c.name);
+  });
+  S.rows = rows;
+}
+
+function renderSummary() {
+  const apps = S.data.applications, cfg = S.data.config;
+  const counts = {};
+  for (const a of apps) counts[a.status] = (counts[a.status] || 0) + 1;
+  const week = apps.filter(a => a.date_applied && daysSince(a.date_applied) < 7).length;
+  const stale = apps.filter(isStale).length;
+  const notApplied = S.data.companies.filter(c => !coApps(c.id).length).length;
+  const stat = (n, label, attrs, on, color) =>
+    `<button class="stat ${on ? "on" : ""}" ${attrs} ${color ? `style="--c:${color}"` : ""}><b>${n}</b><span>${color ? "<i></i>" : ""}${label}</span></button>`;
+  $("#summary").innerHTML =
+    cfg.statuses.map(s => stat(counts[s] || 0, esc(s), `data-stat-status="${esc(s)}"`, S.status === s, statusColor(s))).join("") +
+    stat(week, "applied this week", `data-stat="week"`, false) +
+    stat(stale, "need a follow-up", `data-stat="stale"`, S.filters.has("stale"), stale ? "var(--accent)" : "") +
+    stat(notApplied, "not applied yet", `data-stat="notapplied"`, S.filters.has("notapplied")) +
+    stat(S.data.companies.length, "companies", `data-stat="companies"`, false);
+  $(".stat[data-stat=week]").classList.add("sep");
+}
+
+function renderUpcoming() {
+  const cfg = S.data.config, box = $("#upcoming");
+  const list = S.data.events.filter(e => isUpcoming(e) && daysSince(e.event_date) >= -cfg.upcoming_days).sort(byWhen);
+  box.hidden = !list.length;
+  if (!list.length) return;
+  box.innerHTML = `<h2>Coming up</h2>` + list.slice(0, 8).map(e => {
+    const c = S.co.get(e.company_id);
+    return `<div class="up" data-open="${e.company_id}">
+      <div class="when"><b>${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " · " + e.event_time : ""}</b><span>${ago(daysSince(e.event_date))}</span></div>
+      <div><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(KINDS[e.kind] || e.kind)}</div></div>
+      <div class="what">${esc(e.body)}</div>
+      <button class="btn small" data-brief="${e.company_id}" data-brief-app="${e.application_id || ""}">Brief</button>
+    </div>`;
+  }).join("");
+}
+
+function renderChips() {
+  const keys = Object.keys(FILTERS).filter(k => !FILTERS[k].only || FILTERS[k].only === S.view);
+  let html = keys.map(k => `<button class="chip ${S.filters.has(k) ? "on" : ""}" data-filter="${k}">${FILTERS[k].label}</button>`).join("");
+  if (S.status) html += `<button class="chip on" data-clear-status style="--c:${statusColor(S.status)}">Status: ${esc(S.status)} ✕</button>`;
+  if (S.filters.size || S.status || S.q) html += `<button class="chip clear" data-clear>Clear all</button>`;
+  const noun = S.view === "applications" ? "application" : "compan";
+  const n = S.rows.length;
+  html += `<span class="count">${n} ${noun}${S.view === "applications" ? (n === 1 ? "" : "s") : (n === 1 ? "y" : "ies")}</span>`;
+  $("#chips").innerHTML = html;
+}
+
+function renderTable() {
+  const cols = COLS[S.view], srt = S.sort[S.view];
+  $("#grid thead").innerHTML = "<tr>" + cols.map(c =>
+    `<th data-sort="${c.key}" class="${c.cls || ""}">${c.label}${srt.key === c.key ? (srt.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("") + "</tr>";
+  $("#grid tbody").innerHTML = S.rows.map((r, i) =>
+    `<tr data-i="${i}" class="${i === S.sel ? "sel" : ""}">` + cols.map(c => `<td class="${c.cls || ""}">${c.cell(r)}</td>`).join("") + "</tr>").join("");
+  const empty = $("#empty");
+  empty.hidden = S.rows.length > 0;
+  if (!S.rows.length) {
+    const isCo = S.view === "companies";
+    const none = !(isCo ? S.data.companies : S.data.applications).length;
+    empty.innerHTML = none && !(S.q || S.filters.size || S.status)
+      ? `No ${isCo ? "companies" : "applications"} yet.<br><button class="btn primary" id="empty-new">+ Add your first ${isCo ? "company" : "application"}</button>` +
+        (S.data.companies.length ? "" : `<button class="btn" data-menu="import">Import from your spreadsheet (CSV)</button>`)
+      : `Nothing matches. <br><button class="btn" data-clear>Clear filters</button>`;
+  }
+}
+
+function renderMain() {
+  $$(".views button").forEach(b => b.classList.toggle("on", b.dataset.view === S.view));
+  buildRows();
+  if (S.sel >= S.rows.length) S.sel = S.rows.length - 1;
+  renderSummary();
+  renderUpcoming();
+  renderChips();
+  renderTable();
+}
+
+function setView(view) {
+  S.view = view; S.sel = -1; store("view", view);
+  if (view === "applications") S.filters.delete("notapplied");
+  renderMain();
+}
+
+function moveSel(d) {
+  if (!S.rows.length) return;
+  S.sel = Math.max(0, Math.min(S.rows.length - 1, S.sel + d));
+  $$("#grid tbody tr").forEach(tr => tr.classList.toggle("sel", +tr.dataset.i === S.sel));
+  $(`#grid tbody tr[data-i="${S.sel}"]`)?.scrollIntoView({ block: "nearest" });
+}
+function openRow(i) {
+  const r = S.rows[i];
+  if (r) { S.sel = i; openDrawer(r.c.id, r.a?.id); }
+}
+
+async function setStatus(appId, status) {
+  try {
+    await api("PATCH", `/api/applications/${appId}`, { status });
+    await reload();
+    renderMain();
+    if (S.open) renderDrawer(true);
+    toast(`Status set to ${status || "—"}`);
+  } catch (err) { toast(err.message, "error"); }
+}
+
+// ---------- drawer -----------------------------------------------------------------------------
+
+const attrs = (t, id, f) => `data-t="${t}" data-id="${id}" data-f="${f}"`;
+const inp = (t, id, f, v, o = {}) => `<input type="${o.type || "text"}" ${attrs(t, id, f)} value="${esc(v)}" placeholder="${esc(o.ph || "")}" class="${o.cls || ""}">`;
+const area = (t, id, f, v, ph = "", rows = 2) => `<textarea ${attrs(t, id, f)} rows="${rows}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
+const chk = (t, id, f, v, label) => `<label class="check"><input type="checkbox" ${attrs(t, id, f)} ${v ? "checked" : ""}>${label}</label>`;
+const fld = (label, html) => `<label class="fld"><span>${label}</span>${html}</label>`;
+const linkField = (input, url) => `<div class="withlink">${input}${url ? `<a href="${esc(href(url))}" target="_blank" rel="noopener" title="Open">↗</a>` : ""}</div>`;
+
+function openDrawer(cid, appId) {
+  S.open = { cid, appId, fresh: true };
+  $("#drawer").hidden = false;
+  renderDrawer();
+}
+function closeDrawer() {
+  if (document.activeElement && $("#drawer").contains(document.activeElement)) document.activeElement.blur();
+  S.open = null;
+  $("#drawer").hidden = true;
+}
+
+function renderDrawer(keepScroll) {
+  const drawer = $("#drawer");
+  const { cid, appId } = S.open;
+  const c = S.co.get(cid);
+  if (!c) return closeDrawer();
+  const scroll = keepScroll ? $(".dbody", drawer)?.scrollTop || 0 : 0;
+  const draft = keepScroll ? logDraft() : null;
+  const apps = coApps(cid).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id);
+  const people = S.peopleBy.get(cid) || [];
+  const next = upcomingFor(cid)[0];
+
+  drawer.innerHTML = `
+  <div class="dh">
+    <input type="text" class="dtitle" ${attrs("companies", c.id, "name")} value="${esc(c.name)}" aria-label="Company name">
+    <button class="btn" data-act="brief" title="Summary image for interview prep">Brief <kbd>b</kbd></button>
+    <button class="btn ghost" data-act="close" title="Close (Esc)">✕</button>
+  </div>
+  <div class="dbody">
+    ${next ? `<div class="callout"><b>Coming up ${esc(ago(daysSince(next.event_date)))}:</b> ${fmtDate(next.event_date, { weekday: true })}${next.event_time ? " at " + esc(next.event_time) : ""}. ${esc(next.body)}</div>` : ""}
+    <section class="sec">
+      <div class="grid2">
+        ${fld("Website", linkField(inp("companies", c.id, "website", c.website, { ph: "company.com" }), c.website))}
+        ${fld("Remote", `<select ${attrs("companies", c.id, "remote")}>${Object.entries(REMOTE).map(([v, l]) => `<option value="${v}" ${v === c.remote ? "selected" : ""}>${v ? l : "Not sure"}</option>`).join("")}</select>`)}
+      </div>
+      <div class="checks">${chk("companies", c.id, "is_big_tech", c.is_big_tech, "Big tech")}${chk("companies", c.id, "urgent", c.urgent, "★ Urgent: apply soon")}</div>
+      ${fld("What they do", area("companies", c.id, "about", c.about, "Products, customers, size, anything worth remembering. Shows on the brief."))}
+      ${fld("References", area("companies", c.id, "refs", c.refs, "Who referred you, who you know there", 1))}
+      ${fld("Notes", area("companies", c.id, "notes", c.notes, "Anything else", 2))}
+    </section>
+    <section class="sec">
+      <div class="sech"><h3>Applications (${apps.length})</h3><button class="btn small" data-act="add-app">+ Add application</button></div>
+      ${apps.map(a => appCard(a, a.id === appId)).join("") || `<p class="empty-note">Not applied yet.</p>`}
+    </section>
+    <section class="sec">
+      <div class="sech"><h3>People</h3><button class="btn small" data-act="add-person">+ Add person</button></div>
+      ${people.map(personRow).join("") || `<p class="empty-note">Recruiters, interviewers, referrers. They show up on the brief.</p>`}
+    </section>
+    <section class="sec">
+      <div class="sech"><h3>Log</h3></div>
+      ${logForm(apps, appId)}
+      ${timeline(cid, apps)}
+    </section>
+    <div class="danger-zone"><button class="btn small danger" data-act="del-company">Delete company</button></div>
+  </div>`;
+
+  $$("textarea", drawer).forEach(autosize);
+  if (draft) restoreLogDraft(draft);
+  const body = $(".dbody", drawer);
+  if (keepScroll) body.scrollTop = scroll;
+  else if (S.open.fresh && appId) $(`.card[data-app="${appId}"]`, drawer)?.scrollIntoView({ block: "nearest" });
+  S.open.fresh = false;
+}
+
+function appCard(a, highlight) {
+  const t = "applications", id = a.id, days = daysSince(a.date_applied);
+  return `<div class="card app ${highlight ? "hl" : ""}" data-app="${id}">
+    <div class="card-h">${inp(t, id, "position", a.position, { ph: "Position" })}${statusSelect(a)}</div>
+    ${fld("Job post", linkField(inp(t, id, "job_url", a.job_url, { ph: "https://…" }), a.job_url))}
+    <div class="grid3">
+      ${fld(`Date applied${days != null ? ` <span class="muted">(${ago(days)})</span>` : ""}`, inp(t, id, "date_applied", a.date_applied, { type: "date" }))}
+      ${fld("Offer", inp(t, id, "offer", a.offer, { ph: "Salary, terms" }))}
+      ${fld("Joining date", inp(t, id, "joining_date", a.joining_date, { type: "date" }))}
+    </div>
+    ${fld("Tools", inp(t, id, "tools", a.tools, { ph: "Python, AWS, Figma" }))}
+    ${fld("Responsibilities", area(t, id, "responsibilities", a.responsibilities, "What the role involves", 2))}
+    ${fld("Comments", area(t, id, "comments", a.comments, "", 1))}
+    <div class="card-f"><span>Added ${fmtDate(a.created_at.slice(0, 10))}</span><button class="btn small ghost danger" data-act="del-app" data-id="${id}">Delete application</button></div>
+  </div>`;
+}
+
+function personRow(p) {
+  const t = "contacts", id = p.id;
+  return `<div class="person"><div>
+      <div class="grid3">${inp(t, id, "name", p.name, { ph: "Name" })}${inp(t, id, "role", p.role, { ph: "Role, e.g. Hiring manager" })}${inp(t, id, "link", p.link, { ph: "LinkedIn or email" })}</div>
+      ${area(t, id, "notes", p.notes, "What to remember about them", 1)}
+    </div><button class="btn small ghost" data-act="del-person" data-id="${id}" title="Remove">✕</button></div>`;
+}
+
+function logForm(apps, appId) {
+  const kinds = Object.entries(KINDS).filter(([k]) => !["status", "applied"].includes(k));
+  const defApp = appId || apps[0]?.id || "";
+  const appSel = apps.length > 1
+    ? `<select id="log-app" title="Which application"><option value="">Whole company</option>${apps.map(a => `<option value="${a.id}" ${a.id === defApp ? "selected" : ""}>${esc(a.position || "Untitled")}</option>`).join("")}</select>`
+    : `<input type="hidden" id="log-app" value="${defApp}">`;
+  return `<div class="logform">
+    <div class="tpls">${Object.entries(TEMPLATES).map(([k, t]) => `<button data-tpl="${k}">${t.label}</button>`).join("")}</div>
+    <textarea id="log-body" rows="2" placeholder="What happened? e.g. Talked to Sam (recruiter), they'll forward my CV to the team"></textarea>
+    <div class="logrow">
+      <select id="log-kind" title="Kind">${kinds.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select>
+      ${appSel}
+      <input type="date" id="log-date" title="When it happens or happened (optional)">
+      <input type="time" id="log-time" title="Time (optional)">
+      <button class="btn primary" data-act="add-log">Add <kbd>Ctrl+Enter</kbd></button>
+    </div>
+  </div>`;
+}
+
+function logDraft() {
+  const b = $("#log-body");
+  return b ? { body: b.value, kind: $("#log-kind").value, date: $("#log-date").value, time: $("#log-time").value } : null;
+}
+function restoreLogDraft(d) {
+  $("#log-body").value = d.body; $("#log-kind").value = d.kind; $("#log-date").value = d.date; $("#log-time").value = d.time;
+}
+
+function timelineItems(cid) {
+  const items = coEvents(cid).map(e => ({ ...e, when: evDate(e) }));
+  for (const a of coApps(cid)) {
+    if (a.date_applied) items.push({ id: null, kind: "applied", body: `Applied for ${a.position || "a role"}`, when: a.date_applied, event_time: "", application_id: a.id, event_date: a.date_applied, created_at: a.created_at });
+  }
+  return items;
+}
+
+function timeline(cid, apps) {
+  const items = timelineItems(cid);
+  if (!items.length) return `<p class="empty-note">Nothing logged yet. Interviews, calls and emails you log show up here and on the brief.</p>`;
+  const future = items.filter(e => e.id && isUpcoming(e)).sort(byWhen);
+  const past = items.filter(e => !future.includes(e)).sort((x, y) => (y.when + (y.event_time || "")).localeCompare(x.when + (x.event_time || "")) || (y.created_at || "").localeCompare(x.created_at || ""));
+  const appName = id => apps.find(a => a.id === id)?.position;
+  const row = e => {
+    const color = kindColor(e.kind);
+    const tag = apps.length > 1 && e.application_id && e.kind !== "applied" ? `<span class="tag">${esc(appName(e.application_id) || "")}</span>` : "";
+    return `<div class="ev ${future.includes(e) ? "future" : ""}" style="--c:${color}" ${e.id ? `data-ev="${e.id}"` : ""}>
+      <div class="dot"></div>
+      <div class="evmain">
+        <div class="evmeta"><span class="k">${esc(KINDS[e.kind] || e.kind)}</span><span>${fmtDate(e.when, { weekday: true })}${e.event_time ? " · " + esc(e.event_time) : ""}</span><span>· ${ago(daysSince(e.when))}</span>${tag}</div>
+        <div class="evbody">${esc(e.body)}</div>
+      </div>
+      <div class="evact">${e.id ? `<button data-act="edit-ev" data-id="${e.id}">Edit</button><button data-act="del-ev" data-id="${e.id}" title="Delete">✕</button>` : ""}</div>
+    </div>`;
+  };
+  return (future.length ? `<div class="tl-group">Coming up</div>${future.map(row).join("")}` : "") +
+    (past.length ? `<div class="tl-group">History</div>${past.map(row).join("")}` : "");
+}
+
+function editEvent(id) {
+  const e = findRow("events", id), el = $(`.ev[data-ev="${id}"] .evmain`);
+  const kinds = Object.entries(KINDS).filter(([k]) => k !== "applied");
+  el.innerHTML = `<textarea id="ev-body-${id}" rows="2">${esc(e.body)}</textarea>
+    <div class="logrow">
+      <select id="ev-kind-${id}">${kinds.map(([k, l]) => `<option value="${k}" ${k === e.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <input type="date" id="ev-date-${id}" value="${esc(e.event_date)}"><input type="time" id="ev-time-${id}" value="${esc(e.event_time)}">
+      <button class="btn small primary" data-act="save-ev" data-id="${id}">Save</button><button class="btn small" data-act="cancel-ev">Cancel</button>
+    </div>`;
+  const ta = $(`#ev-body-${id}`);
+  autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+function autosize(ta) {
+  const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + 2 + "px"; };
+  ta.addEventListener("input", fit);
+  requestAnimationFrame(fit);
+}
+
+async function saveField(el) {
+  const t = el.dataset.t, id = +el.dataset.id, f = el.dataset.f;
+  const value = el.type === "checkbox" ? el.checked : el.value;
+  const current = findRow(t, id)?.[f];
+  if (current === value || (current ?? "") === value) return;
+  clearTimeout(el._timer);
+  try {
+    const row = await api("PATCH", `/api/${t}/${id}`, { [f]: value });
+    replaceRow(t, row);
+    el.classList.remove("bad");
+    if (f === "tools" && el.value !== row.tools && document.activeElement !== el) el.value = row.tools;
+    el.classList.add("saved");
+    setTimeout(() => el.classList.remove("saved"), 700);
+    renderMain();
+  } catch (err) {
+    el.classList.add("bad");
+    toast(err.message, "error");
+  }
+}
+
+async function addLog() {
+  const body = $("#log-body").value.trim();
+  const date = $("#log-date").value, time = $("#log-time").value;
+  if (!body && !date) { $("#log-body").focus(); return toast("Write what happened first", "error"); }
+  const appVal = $("#log-app").value;
+  try {
+    await api("POST", "/api/events", {
+      company_id: S.open.cid, application_id: appVal ? +appVal : null,
+      kind: $("#log-kind").value, body, event_date: date, event_time: time,
+    });
+    await reload();
+    renderMain();
+    renderDrawer(true);
+    $("#log-body").value = ""; $("#log-date").value = ""; $("#log-time").value = ""; $("#log-kind").value = "note";
+    toast("Logged");
+  } catch (err) { toast(err.message, "error"); }
+}
+
+function useTemplate(key) {
+  const t = TEMPLATES[key], ta = $("#log-body");
+  $("#log-kind").value = t.kind;
+  ta.value = t.body;
+  if (t.today && !$("#log-date").value) $("#log-date").value = S.data.today;
+  if (key === "interview") $("#log-date").value = "";
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+async function drawerAction(act, el) {
+  const cid = S.open?.cid;
+  const refresh = async () => { await reload(); renderMain(); renderDrawer(true); };
+  try {
+    switch (act) {
+      case "close": return closeDrawer();
+      case "brief": return openBrief(cid, S.open.appId);
+      case "add-app": {
+        const row = await api("POST", "/api/applications", { company_id: cid, status: S.data.config.statuses[0] || "", date_applied: S.data.today });
+        S.open.appId = row.id;
+        await refresh();
+        const card = $(`.card[data-app="${row.id}"]`);
+        card?.scrollIntoView({ block: "center" });
+        $("input[data-f=position]", card)?.focus();
+        return;
+      }
+      case "del-app":
+        if (!confirm("Delete this application? Its log entries stay with the company.")) return;
+        await api("DELETE", `/api/applications/${el.dataset.id}`);
+        return refresh();
+      case "add-person": {
+        const row = await api("POST", "/api/contacts", { company_id: cid });
+        await refresh();
+        $(`input[data-t=contacts][data-id="${row.id}"][data-f=name]`)?.focus();
+        return;
+      }
+      case "del-person":
+        await api("DELETE", `/api/contacts/${el.dataset.id}`);
+        return refresh();
+      case "add-log": return addLog();
+      case "edit-ev": return editEvent(+el.dataset.id);
+      case "cancel-ev": return renderDrawer(true);
+      case "save-ev": {
+        const id = el.dataset.id;
+        await api("PATCH", `/api/events/${id}`, {
+          body: $(`#ev-body-${id}`).value, kind: $(`#ev-kind-${id}`).value,
+          event_date: $(`#ev-date-${id}`).value, event_time: $(`#ev-time-${id}`).value,
+        });
+        return refresh();
+      }
+      case "del-ev":
+        if (!confirm("Delete this log entry?")) return;
+        await api("DELETE", `/api/events/${el.dataset.id}`);
+        return refresh();
+      case "del-company": {
+        const c = S.co.get(cid);
+        if (!confirm(`Delete ${c.name} with its ${coApps(cid).length} application(s), people and log? This can't be undone.`)) return;
+        await api("DELETE", `/api/companies/${cid}`);
+        closeDrawer();
+        await reload(); renderMain();
+        return toast(`Deleted ${c.name}`);
+      }
+    }
+  } catch (err) { toast(err.message, "error"); }
+}
+
+// ---------- modals -----------------------------------------------------------------------------
+
+let modalEl = null;
+function openModal(html, cls = "") {
+  closeModal();
+  modalEl = document.createElement("div");
+  modalEl.className = "backdrop";
+  modalEl.innerHTML = `<div class="modal ${cls}" role="dialog" aria-modal="true">${html}</div>`;
+  modalEl.addEventListener("mousedown", e => { if (e.target === modalEl) closeModal(); });
+  document.body.appendChild(modalEl);
+  return modalEl.firstElementChild;
+}
+function closeModal() { modalEl?.remove(); modalEl = null; }
+
+function toast(msg, type = "", action) {
+  const t = document.createElement("div");
+  t.className = "toast " + type;
+  t.innerHTML = `<span>${esc(msg)}</span>`;
+  if (action) {
+    const b = document.createElement("button");
+    b.textContent = action.label;
+    b.onclick = () => { action.fn(); t.remove(); };
+    t.appendChild(b);
+  }
+  $("#toast").appendChild(t);
+  setTimeout(() => t.remove(), type === "error" ? 6000 : action ? 5000 : 2200);
+}
+
+// ----- quick add
+
+const JOB_BOARDS = /(^|\.)(linkedin|indeed|glassdoor|monster|ziprecruiter|remoteok|weworkremotely|otta|welcometothejungle|builtin|dice|simplyhired|naukri|rozee|bayt|seek|stepstone|xing|remotive|jobs\.github)\./;
+const SUBDOMAIN_ATS = /\.(recruitee\.com|bamboohr\.com|teamtailor\.com|breezy\.hr|personio\.(de|com)|applytojob\.com|freshteam\.com|pinpointhq\.com|zohorecruit\.com|rippling-ats\.com|join\.com)$/;
+const PATH_ATS = [
+  [/(^|\.)greenhouse\.io$/, (u, seg) => seg[0] === "embed" ? u.searchParams.get("for") : seg[0]],
+  [/^jobs\.(lever\.co|ashbyhq\.com|smartrecruiters\.com|jobvite\.com)$/, (u, seg) => seg[0]],
+  [/^(apply\.)?workable\.com$/, (u, seg) => seg[0] === "j" ? null : seg[0]],
+  [/^(wellfound\.com|angel\.co)$/, (u, seg) => seg[0] === "company" ? seg[1] : null],
+  [/^ycombinator\.com$/, (u, seg) => seg[0] === "companies" ? seg[1] : null],
+  [/^join\.com$/, (u, seg) => seg[0] === "companies" ? seg[1] : null],
+];
+const titleCase = s => s.replace(/[-_.]+/g, " ").replace(/\s+/g, " ").trim().replace(/\b\w/g, c => c.toUpperCase());
+
+function guessFromUrl(raw) {
+  let u;
+  try { u = new URL(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : "https://" + raw.trim()); } catch { return null; }
+  if (!u.hostname.includes(".")) return null;
+  const h = u.hostname.toLowerCase().replace(/^www\./, "");
+  const seg = u.pathname.split("/").filter(Boolean);
+  for (const [re, fn] of PATH_ATS) if (re.test(h)) { const slug = fn(u, seg); return slug ? { name: titleCase(slug), website: "" } : null; }
+  if (SUBDOMAIN_ATS.test(h) || /myworkdayjobs\.com$/.test(h)) {
+    const sub = h.split(".")[0];
+    return /^wd\d+$/.test(sub) ? null : { name: titleCase(sub), website: "" };
+  }
+  if (JOB_BOARDS.test("." + h)) return null;
+  const labels = h.split(".");
+  let n = 2;
+  if (labels.length >= 3 && labels.at(-1).length === 2 && ["co", "com", "org", "net", "ac", "gov", "edu"].includes(labels.at(-2))) n = 3;
+  const domain = labels.slice(-n).join(".");
+  return { name: titleCase(labels.at(-n)), website: "https://" + domain };
+}
+
+function popularTools() {
+  const counts = new Map();
+  for (const a of S.data.applications) for (const t of splitTools(a.tools)) counts.set(t, (counts.get(t) || 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([t]) => t);
+}
+
+function openQuickAdd(prefill = {}) {
+  const cfg = S.data.config;
+  const m = openModal(`
+    <h2>New application</h2>
+    <form id="qa" autocomplete="off">
+      ${fld("Job post link", `<input type="url" name="job_url" placeholder="Paste the link and the company is filled in for you">`)}
+      <div class="grid2">
+        ${fld("Company", `<input type="text" name="name" list="co-list" required>`)}
+        ${fld("Position", `<input type="text" name="position" placeholder="e.g. Backend Engineer">`)}
+      </div>
+      <div class="cohint" id="qa-hint"></div>
+      <div class="grid3">
+        ${fld("Status", `<select name="status">${statusOptions(cfg.statuses[0])}</select>`)}
+        ${fld("Date applied", `<input type="date" name="date_applied" value="${S.data.today}">`)}
+        ${fld("Remote", `<select name="remote" data-co>${Object.entries(REMOTE).map(([v, l]) => `<option value="${v}">${v ? l : "Not sure"}</option>`).join("")}</select>`)}
+      </div>
+      ${fld("Website", `<input type="text" name="website" placeholder="company.com" data-co>`)}
+      ${fld("Tools", `<input type="text" name="tools" placeholder="Comma separated: Python, AWS, Figma">`)}
+      <div class="popular" id="qa-tools"></div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" name="is_big_tech" data-co> Big tech</label>
+        <label class="check"><input type="checkbox" name="urgent" data-co> ★ Urgent</label>
+      </div>
+      ${fld("Comments", `<textarea name="comments" rows="2"></textarea>`)}
+      <p class="muted" style="font-size:12px;margin:0">Leave Position and the link empty to just save the company for later.</p>
+      <div class="actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn" id="qa-another">Save &amp; add another</button>
+        <button type="submit" class="btn primary">Save <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </form>`);
+  const form = $("#qa", m), F = form.elements;
+  let autoName = false;
+  const tools = popularTools();
+  $("#qa-tools", m).innerHTML = tools.length ? tools.map(t => `<button type="button" data-tool="${esc(t)}">+ ${esc(t)}</button>`).join("") : "";
+  $("#qa-tools", m).addEventListener("click", e => {
+    const b = e.target.closest("[data-tool]"); if (!b) return;
+    const list = splitTools(F.tools.value);
+    if (!list.some(t => t.toLowerCase() === b.dataset.tool.toLowerCase())) list.push(b.dataset.tool);
+    F.tools.value = list.join(", ");
+  });
+
+  const syncCompany = () => {
+    const ex = S.data.companies.find(c => c.name.toLowerCase() === F.name.value.trim().toLowerCase());
+    const hint = $("#qa-hint", m);
+    $$("[data-co]", form).forEach(el => el.disabled = !!ex);
+    if (ex) {
+      F.website.value = ex.website; F.remote.value = ex.remote; F.is_big_tech.checked = ex.is_big_tech; F.urgent.checked = ex.urgent;
+      const n = coApps(ex.id).length;
+      hint.innerHTML = `Adding to <b>${esc(ex.name)}</b>, already tracked (${n} application${n === 1 ? "" : "s"}).`;
+    } else {
+      hint.textContent = F.name.value.trim() ? "New company." : "";
+    }
+    form.dataset.existing = ex ? "1" : "";
+  };
+  F.job_url.addEventListener("input", () => {
+    const g = guessFromUrl(F.job_url.value);
+    if (!g) return;
+    if (!F.name.value || autoName) { F.name.value = g.name; autoName = true; }
+    if (!F.website.value && g.website && !form.dataset.existing) F.website.value = g.website;
+    syncCompany();
+  });
+  F.name.addEventListener("input", () => { autoName = false; syncCompany(); });
+  Object.entries(prefill).forEach(([k, v]) => { if (F[k]) F[k].value = v; });
+  syncCompany();
+
+  const save = async (another) => {
+    if (!F.name.value.trim()) { F.name.focus(); return toast("Company name is needed", "error"); }
+    const payload = {
+      company: { name: F.name.value, website: F.website.value, remote: F.remote.value, is_big_tech: F.is_big_tech.checked, urgent: F.urgent.checked },
+      application: { position: F.position.value, job_url: F.job_url.value, tools: F.tools.value, date_applied: F.date_applied.value, status: F.status.value, comments: F.comments.value },
+    };
+    try {
+      const out = await api("POST", "/api/quick-add", payload);
+      await reload(); renderMain();
+      const what = [F.name.value.trim(), F.position.value.trim()].filter(Boolean).join(" · ");
+      toast(out.application_id ? `Saved ${what}` : `Saved ${what} for later`, "", { label: "Open", fn: () => openDrawer(out.company_id, out.application_id) });
+      if (another) {
+        for (const k of ["job_url", "name", "position", "tools", "comments", "website"]) F[k].value = "";
+        F.is_big_tech.checked = F.urgent.checked = false; F.remote.value = "";
+        autoName = false; syncCompany();
+        F.job_url.focus();
+      } else closeModal();
+    } catch (err) { toast(err.message, "error"); }
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); save(false); });
+  $("#qa-another", m).onclick = () => save(true);
+  form.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(e.shiftKey); } });
+  $("[data-close]", m).onclick = closeModal;
+  F.job_url.focus();
+  if (prefill.name) F.name.dispatchEvent(new Event("input"));
+}
+
+// The New button and `n` add a company on the Companies tab, an application everywhere else.
+const openNew = () => S.view === "companies" ? openCompanyForm() : openQuickAdd();
+
+function openCompanyForm() {
+  const m = openModal(`
+    <h2>New company</h2>
+    <form id="cf" autocomplete="off">
+      ${fld("Company", `<input type="text" name="name" required>`)}
+      <div class="cohint" id="cf-hint"></div>
+      <div class="grid2">
+        ${fld("Website", `<input type="text" name="website" placeholder="company.com">`)}
+        ${fld("Remote", `<select name="remote">${Object.entries(REMOTE).map(([v, l]) => `<option value="${v}">${v ? l : "Not sure"}</option>`).join("")}</select>`)}
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" name="is_big_tech"> Big tech</label>
+        <label class="check"><input type="checkbox" name="urgent"> ★ Urgent: apply soon</label>
+      </div>
+      ${fld("What they do", `<textarea name="about" rows="2" placeholder="Products, customers, size. Shows on the brief."></textarea>`)}
+      ${fld("Notes", `<textarea name="notes" rows="2"></textarea>`)}
+      <p class="muted" style="font-size:12px;margin:0">Already applied? <a href="#" id="cf-app">Add an application instead</a>.</p>
+      <div class="actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn" id="cf-another">Save &amp; add another</button>
+        <button type="submit" class="btn primary">Save <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </form>`);
+  const form = $("#cf", m), F = form.elements, hint = $("#cf-hint", m);
+  const existing = () => S.data.companies.find(c => c.name.toLowerCase() === F.name.value.trim().toLowerCase());
+  F.name.addEventListener("input", () => {
+    const ex = existing();
+    hint.innerHTML = ex ? `<b>${esc(ex.name)}</b> is already tracked. <a href="#" id="cf-open">Open it</a>` : "";
+  });
+  hint.addEventListener("click", e => {
+    if (!e.target.closest("#cf-open")) return;
+    e.preventDefault();
+    const ex = existing();
+    closeModal();
+    if (ex) openDrawer(ex.id);
+  });
+  $("#cf-app", m).onclick = e => { e.preventDefault(); const name = F.name.value.trim(); closeModal(); openQuickAdd(name ? { name } : {}); };
+
+  const save = async (another) => {
+    if (!F.name.value.trim()) { F.name.focus(); return toast("Company name is needed", "error"); }
+    try {
+      const row = await api("POST", "/api/companies", {
+        name: F.name.value, website: F.website.value, remote: F.remote.value,
+        is_big_tech: F.is_big_tech.checked, urgent: F.urgent.checked, about: F.about.value, notes: F.notes.value,
+      });
+      await reload(); renderMain();
+      toast(`Saved ${row.name}`, "", { label: "Open", fn: () => openDrawer(row.id) });
+      if (another) { form.reset(); hint.innerHTML = ""; F.name.focus(); } else closeModal();
+    } catch (err) { toast(err.message, "error"); }
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); save(false); });
+  $("#cf-another", m).onclick = () => save(true);
+  form.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(e.shiftKey); } });
+  $("[data-close]", m).onclick = closeModal;
+  F.name.focus();
+}
+
+// ----- import
+
+async function runImport(text, order, dry) {
+  const res = await fetch(`/api/import?dry=${dry ? 1 : 0}&order=${order}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "text/csv" }, body: text });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function importFile(file) {
+  const text = await file.text();
+  let order = "auto";
+  const show = async () => {
+    let r;
+    try { r = await runImport(text, order, true); } catch (err) { closeModal(); return toast(err.message, "error"); }
+    order = r.date_order;
+    const m = openModal(`
+      <h2>Import ${esc(file.name)}</h2>
+      <p class="muted" style="margin-top:0">Nothing is saved until you press Import. Importing the same file twice won't create duplicates.</p>
+      <div class="import-stats">
+        <b>${r.rows}</b><span>rows read</span>
+        <b>${r.companies_created}</b><span>new companies</span>
+        <b>${r.companies_updated}</b><span>existing companies filled in</span>
+        <b>${r.applications_created}</b><span>new applications</span>
+        <b>${r.duplicates_skipped}</b><span>applications already here (skipped)</span>
+        ${r.rows_skipped ? `<b>${r.rows_skipped}</b><span>rows without a company name (skipped)</span>` : ""}
+      </div>
+      ${fld("Dates like 03/04/2025 are", `<select id="imp-order"><option value="mdy" ${order === "mdy" ? "selected" : ""}>Month / Day / Year (US)</option><option value="dmy" ${order === "dmy" ? "selected" : ""}>Day / Month / Year</option></select>`)}
+      ${r.unknown_columns.length ? `<p style="font-size:13px">Columns kept in comments: ${r.unknown_columns.map(esc).join(", ")}</p>` : ""}
+      ${r.warnings.length ? `<div class="warnings">${r.warnings.map(w => esc(w)).join("<br>")}</div>` : ""}
+      <div class="actions"><button class="btn" data-close>Cancel</button><button class="btn primary" id="imp-go">Import</button></div>`);
+    $("[data-close]", m).onclick = closeModal;
+    $("#imp-order", m).onchange = e => { order = e.target.value; show(); };
+    $("#imp-go", m).onclick = async () => {
+      try {
+        const done = await runImport(text, order, false);
+        closeModal();
+        await reload(); renderMain();
+        toast(`Imported ${done.companies_created} companies and ${done.applications_created} applications`);
+      } catch (err) { toast(err.message, "error"); }
+    };
+  };
+  show();
+}
+
+function showShortcuts() {
+  const m = openModal(`<h2>Keyboard shortcuts</h2><div class="shortcuts">
+    <kbd>n</kbd><span>New application (a new company on the Companies tab)</span><kbd>/</kbd><span>Search</span>
+    <kbd>j</kbd> <kbd>k</kbd><span>Move down / up the list</span><kbd>Enter</kbd><span>Open the selected row</span>
+    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd> <kbd>2</kbd><span>Applications / Companies</span>
+    <kbd>Ctrl+Enter</kbd><span>Save the form, or add the log entry</span><kbd>Esc</kbd><span>Close / leave a field</span>
+  </div><div class="actions"><button class="btn" data-close>Close</button></div>`);
+  $("[data-close]", m).onclick = closeModal;
+}
+
+// ---------- brief image ------------------------------------------------------------------------
+
+function openBrief(cid, appId) {
+  const c = S.co.get(cid), apps = coApps(cid);
+  const chosen = apps.find(a => a.id === appId) || apps.find(isActive) || latestApp(cid);
+  const m = openModal(`
+    <div class="mhead"><h2>Brief: ${esc(c.name)}</h2>
+      ${apps.length > 1 ? `<select id="brief-app" style="width:auto">${apps.map(a => `<option value="${a.id}" ${a === chosen ? "selected" : ""}>${esc(a.position || "Untitled")}</option>`).join("")}</select>` : ""}
+      <button class="btn" id="brief-copy">Copy image</button>
+      <button class="btn primary" id="brief-dl">Download PNG</button>
+      <button class="btn ghost" data-close>✕</button>
+    </div>
+    <canvas class="brief-canvas" id="brief-canvas"></canvas>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Built from what you've saved: what they do, the role, people, notes and the log. Fill those in the company panel to make it richer.</p>`, "wide");
+  const canvas = $("#brief-canvas", m);
+  const draw = () => drawBrief(canvas, cid, +($("#brief-app", m)?.value || chosen?.id || 0));
+  draw();
+  $("#brief-app", m)?.addEventListener("change", draw);
+  $("[data-close]", m).onclick = closeModal;
+  const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  $("#brief-dl", m).onclick = () => {
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `brief-${slug}-${S.data.today}.png`;
+    a.click();
+  };
+  $("#brief-copy", m).onclick = () => canvas.toBlob(async blob => {
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); toast("Image copied"); }
+    catch { toast("Your browser blocked copying; use Download instead", "error"); }
+  }, "image/png");
+}
+
+function drawBrief(canvas, cid, appId) {
+  const c = S.co.get(cid), apps = coApps(cid);
+  const app = apps.find(a => a.id === appId) || latestApp(cid);
+  const people = S.peopleBy.get(cid) || [];
+  const next = upcomingFor(cid)[0];
+  const W = 1000, P = 44, GAP = 26, COLGAP = 32, SCALE = 2, MAXH = 6000;
+  const FONT = '"Helvetica Neue", Helvetica, Arial, "Nimbus Sans", "Liberation Sans", sans-serif';
+  // The image is always light, whatever the page theme, so it reads the same when shared or printed.
+  const C = { bg: "#ffffff", ink: "#000000", muted: "#666666", faint: "#9a9a9a", red: "#e30613" };
+  const statusHex = s => ({ Interview: C.red, Offer: C.red, Rejected: C.faint, Ghosted: "#b8b8b8", Withdrawn: "#b8b8b8" }[s] || C.ink);
+  const kindHex = k => k === "interview" ? C.red : k === "note" || k === "other" ? C.faint : k === "status" ? C.muted : C.ink;
+
+  const tmp = document.createElement("canvas");
+  tmp.width = W * SCALE; tmp.height = MAXH * SCALE;
+  const x = tmp.getContext("2d");
+  x.scale(SCALE, SCALE);
+  x.textBaseline = "top";
+  x.fillStyle = C.bg; x.fillRect(0, 0, W, MAXH);
+  const font = (size, weight = 400, ls = 0) => {
+    x.font = `${weight} ${size}px ${FONT}`;
+    if ("letterSpacing" in x) x.letterSpacing = `${ls}px`;
+  };
+
+  const lines = (str, w, max) => {
+    const out = [];
+    for (const para of String(str || "").split("\n")) {
+      if (!para.trim()) { if (out.length && out.at(-1) !== "") out.push(""); continue; }
+      let line = "";
+      for (const word of para.trim().split(/\s+/)) {
+        const test = line ? line + " " + word : word;
+        if (x.measureText(test).width <= w) { line = test; continue; }
+        if (line) out.push(line);
+        line = word;
+        while (x.measureText(line).width > w) {
+          let i = line.length;
+          while (i > 1 && x.measureText(line.slice(0, i)).width > w) i--;
+          out.push(line.slice(0, i)); line = line.slice(i);
+        }
+      }
+      if (line) out.push(line);
+    }
+    while (out.length && out.at(-1) === "") out.pop();
+    if (max && out.length > max) {
+      out.length = max;
+      let l = out[max - 1];
+      while (l && x.measureText(l + "…").width > w) l = l.slice(0, -1);
+      out[max - 1] = l + "…";
+    }
+    return out;
+  };
+  // Every drawing helper takes `dry` first: when true it only measures and returns the height.
+  const text = (dry, str, x0, y0, w, o = {}) => {
+    const size = o.size || 15; font(size, o.weight || 400, o.ls || 0);
+    const ls = lines(str, w, o.max || 0), lh = Math.round(size * (o.lh || 1.4));
+    if (!dry) { x.fillStyle = o.color || C.ink; ls.forEach((l, i) => x.fillText(l, x0, y0 + i * lh)); }
+    return ls.length * lh;
+  };
+  // words laid out left to right, wrapping (used for tools)
+  const flow = (dry, items, x0, y0, w) => {
+    font(16, 700);
+    const lh = 24, gap = 20;
+    let cx = x0, cy = y0;
+    for (const it of items) {
+      const tw = Math.min(x.measureText(it).width, w);
+      if (cx + tw > x0 + w && cx > x0) { cx = x0; cy += lh; }
+      if (!dry) { x.fillStyle = C.ink; x.fillText(lines(it, w, 1)[0] || "", cx, cy); }
+      cx += tw + gap;
+    }
+    return items.length ? cy - y0 + lh : 0;
+  };
+  // a status square, the status, then muted text after it
+  const statusLine = (dry, x0, y0, status, rest, size = 16) => {
+    if (!dry) {
+      const label = status || "No status";
+      x.fillStyle = statusHex(status); x.fillRect(x0, y0 + size * .22, size * .7, size * .7);
+      font(size, 700); x.fillText(label, x0 + size * 1.2, y0);
+      const lw = x.measureText(label).width;
+      if (rest) { font(size, 400); x.fillStyle = C.muted; x.fillText(rest, x0 + size * 1.2 + lw + 12, y0); }
+    }
+    return Math.round(size * 1.4);
+  };
+  // a section: a black rule with a bold title under it; or, with `fill`, a solid block
+  const section = (dry, x0, y0, w, title, body, o = {}) => {
+    if (o.fill) {
+      const pad = 20, th = title ? 26 : 0;
+      const h = pad * 2 + th + body(true, x0 + pad, y0 + pad + th, w - 2 * pad);
+      if (!dry) {
+        x.fillStyle = o.fill; x.fillRect(x0, y0, w, h);
+        if (title) { font(13, 700); x.fillStyle = o.titleColor || C.ink; x.fillText(title, x0 + pad, y0 + pad); }
+        body(false, x0 + pad, y0 + pad + th, w - 2 * pad);
+      }
+      return h;
+    }
+    const top = 12, th = title ? 26 : 0;
+    const h = top + th + body(true, x0, y0 + top + th, w) + 4;
+    if (!dry) {
+      x.fillStyle = C.ink; x.fillRect(x0, y0, w, 2);
+      if (title) { font(13, 700); x.fillStyle = C.ink; x.fillText(title, x0, y0 + top); }
+      body(false, x0, y0 + top + th, w);
+    }
+    return h;
+  };
+  // stack: draw several pieces one under another, with gaps
+  const stack = parts => (dry, x0, y0, w) => {
+    let y = y0;
+    parts.filter(Boolean).forEach((p, i) => { if (i) y += p.gap ?? 6; y += p.fn(dry, x0, y, w); });
+    return y - y0;
+  };
+  const T = (str, o) => str ? { fn: (d, x0, y0, w) => text(d, str, x0, y0, w, o), gap: o?.gap } : null;
+
+  // ---- header
+  const meta = [c.website && host(c.website), c.is_big_tech && "Big tech", c.remote && REMOTE[c.remote], c.urgent && "★ Urgent"].filter(Boolean).join("   ·   ");
+  const header = stack([
+    { fn: (d, x0, y0) => {
+      if (!d) { x.fillStyle = C.red; x.fillRect(x0, y0, 20, 20); font(13, 700); x.fillStyle = C.ink; x.fillText("Interview brief", x0 + 32, y0 + 4); }
+      return 20;
+    } },
+    T(c.name, { size: 60, weight: 700, max: 2, lh: 1.02, ls: -2.5, gap: 26 }),
+    T(meta, { size: 16, color: C.muted, gap: 10 }),
+    app && T(app.position || "Untitled role", { size: 26, weight: 700, ls: -.6, gap: 20, max: 2 }),
+    app && { fn: (d, x0, y0) => statusLine(d, x0, y0, app.status, app.date_applied ? `Applied ${fmtDate(app.date_applied, { year: true })}, ${ago(daysSince(app.date_applied))}` : "Not applied yet"), gap: 8 },
+  ]);
+  let y = 40;
+  y += header(false, P, y, W - 2 * P);
+  font(12, 700); x.fillStyle = C.muted; x.textAlign = "right";
+  x.fillText(`Made ${fmtDate(S.data.today, { year: true })}`, W - P, 44);
+  x.textAlign = "left";
+  y += 26;
+  x.fillStyle = C.ink; x.fillRect(P, y, W - 2 * P, 6);
+  y += 6 + GAP;
+
+  // ---- next up
+  if (next) {
+    const when = `${asDate(next.event_date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${next.event_time ? ", " + next.event_time : ""}  (${ago(daysSince(next.event_date))})`;
+    y += section(false, P, y, W - 2 * P, "Next up", stack([
+      T(when, { size: 26, weight: 700, ls: -.6, color: "#fff" }),
+      T(next.body, { size: 17, max: 4, gap: 8, color: "#fff" }),
+    ]), { fill: C.red, titleColor: "#fff" }) + GAP;
+  }
+
+  // ---- two columns
+  const colW = (W - 2 * P - COLGAP) / 2;
+  const left = [], right = [];
+  if (app) {
+    left.push(["The role", stack([
+      T(app.position || "Untitled role", { size: 20, weight: 700, ls: -.3 }),
+      { fn: (d, x0, y0) => statusLine(d, x0, y0, app.status, app.date_applied ? `applied ${fmtDate(app.date_applied, { year: true })}` : "", 15), gap: 8 },
+      app.job_url && T(host(app.job_url), { size: 15, weight: 700, color: C.red, gap: 8 }),
+      app.offer && T(`Offer: ${app.offer}`, { size: 16, weight: 700, gap: 12 }),
+      app.joining_date && T(`Joining ${fmtDate(app.joining_date, { year: true })}`, { size: 15 }),
+    ])]);
+    const tl = splitTools(app.tools);
+    if (tl.length) left.push(["Tools", (d, x0, y0, w) => flow(d, tl, x0, y0, w)]);
+    if (app.responsibilities) left.push(["Responsibilities", stack([T(app.responsibilities, { max: 16 })])]);
+  }
+  if (c.about) right.push(["What they do", stack([T(c.about, { max: 14, size: 16 })])]);
+  if (people.length) {
+    right.push(["People", stack(people.slice(0, 6).flatMap((p, i) => [
+      T(p.name || "Unnamed", { size: 18, weight: 700, ls: -.3, gap: i ? 16 : 0 }),
+      T([p.role, p.link].filter(Boolean).join("   ·   "), { size: 13, color: C.muted, gap: 2 }),
+      T(p.notes, { size: 15, max: 3, gap: 4 }),
+    ]))]);
+  }
+  if (c.refs) right.push(["References", stack([T(c.refs, { max: 6 })])]);
+  const notes = [c.notes, app?.comments].filter(Boolean).join("\n\n");
+  if (notes) (left.length <= right.length ? left : right).push(["My notes", stack([T(notes, { max: 14 })])]);
+  if (!left.length && !right.length && !next) {
+    left.push(["Nothing saved yet", stack([T("Add what they do, the people you'll meet and your notes in the company panel, then open the brief again.", { color: C.muted })])]);
+  }
+  const drawCol = (blocks, x0, w) => { let cy = y; for (const [title, body] of blocks) cy += section(false, x0, cy, w, title, body) + GAP; return cy; };
+  if (!right.length) y = drawCol(left, P, W - 2 * P);
+  else if (!left.length) y = drawCol(right, P, W - 2 * P);
+  else y = Math.max(drawCol(left, P, colW), drawCol(right, P + colW + COLGAP, colW));
+
+  // ---- recent log
+  const items = timelineItems(cid).filter(e => !(e.id && isUpcoming(e)) && e.when <= S.data.today)
+    .sort((a, b) => (b.when + (b.event_time || "")).localeCompare(a.when + (a.event_time || ""))).slice(0, 8);
+  if (items.length) {
+    y += section(false, P, y, W - 2 * P, "Recent history", (d, x0, y0, w) => {
+      let cy = y0;
+      items.forEach((e, i) => {
+        if (i) cy += 12;
+        const dateW = 170;
+        if (!d) {
+          font(14, 700); x.fillStyle = kindHex(e.kind); x.fillText(fmtDate(e.when, { year: true }), x0, cy + 1);
+          font(11, 700); x.fillStyle = C.muted; x.fillText(KINDS[e.kind] || e.kind, x0, cy + 20);
+        }
+        cy += Math.max(36, text(d, e.body || "—", x0 + dateW, cy, w - dateW, { size: 15, max: 3 }));
+      });
+      return cy - y0;
+    }) + GAP;
+  }
+
+  x.fillStyle = C.red; x.fillRect(P, y + 2, 10, 10);
+  font(12, 700); x.fillStyle = C.ink;
+  x.fillText("Job Tracker", P + 18, y);
+  const H = Math.min(y + 40, MAXH);
+
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  canvas.getContext("2d").drawImage(tmp, 0, 0, W * SCALE, H * SCALE, 0, 0, W * SCALE, H * SCALE);
+}
+
+// ---------- events -----------------------------------------------------------------------------
+
+function wire() {
+  $$(".views button").forEach(b => b.onclick = () => setView(b.dataset.view));
+  $("#btn-new").onclick = openNew;
+  $("#search").addEventListener("input", e => { S.q = e.target.value; S.sel = -1; renderMain(); });
+  $("#search").addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); e.target.blur(); S.sel = -1; moveSel(1); if (e.key === "Enter" && S.rows.length === 1) openRow(0); }
+  });
+
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const menu = $("#menu");
+    if (menu.open && !menu.contains(t)) menu.open = false;
+    const m = t.closest("[data-menu]");
+    if (m) {
+      menu.open = false;
+      if (m.dataset.menu === "import") $("#file-import").click();
+      if (m.dataset.menu === "keys") showShortcuts();
+      if (m.dataset.menu === "theme") {
+        const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+        const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+        const nextTheme = cur === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = nextTheme; store("theme", nextTheme);
+      }
+      return;
+    }
+    const ex = t.closest("[data-export]");
+    if (ex) { ex.href = `/export/${ex.dataset.export}?t=${encodeURIComponent(TOKEN)}`; menu.open = false; return; }
+    if (t.closest("#empty-new")) return openNew();
+    const f = t.closest("[data-filter]");
+    if (f) { const k = f.dataset.filter; S.filters.has(k) ? S.filters.delete(k) : S.filters.add(k); S.sel = -1; return renderMain(); }
+    if (t.closest("[data-clear-status]")) { S.status = null; return renderMain(); }
+    if (t.closest("[data-clear]")) { S.filters.clear(); S.status = null; S.q = ""; $("#search").value = ""; return renderMain(); }
+    const st = t.closest("[data-stat-status]");
+    if (st) { const s = st.dataset.statStatus; S.status = S.status === s ? null : s; if (S.view !== "applications" && S.status) setView("applications"); return renderMain(); }
+    const stat = t.closest("[data-stat]");
+    if (stat) {
+      const k = stat.dataset.stat;
+      if (k === "stale") { S.filters.has("stale") ? S.filters.delete("stale") : S.filters.add("stale"); }
+      if (k === "notapplied") { S.filters.has("notapplied") ? S.filters.delete("notapplied") : S.filters.add("notapplied"); if (S.view !== "companies") return setView("companies"); }
+      if (k === "companies" && S.view !== "companies") return setView("companies");
+      if (k === "week") { S.sort.applications = { key: "applied", dir: -1 }; if (S.view !== "applications") return setView("applications"); }
+      return renderMain();
+    }
+    const brief = t.closest("[data-brief]");
+    if (brief) { e.stopPropagation(); return openBrief(+brief.dataset.brief, +brief.dataset.briefApp || null); }
+    const up = t.closest("[data-open]");
+    if (up) return openDrawer(+up.dataset.open);
+  });
+
+  $("#grid thead").addEventListener("click", e => {
+    const th = e.target.closest("[data-sort]"); if (!th) return;
+    const s = S.sort[S.view];
+    if (s.key === th.dataset.sort) s.dir *= -1; else { s.key = th.dataset.sort; s.dir = ["company", "position", "tools", "remote"].includes(s.key) ? 1 : -1; }
+    renderMain();
+  });
+  $("#grid tbody").addEventListener("click", e => {
+    if (e.target.closest("select, a, button")) return;
+    const tr = e.target.closest("tr[data-i]");
+    if (tr) openRow(+tr.dataset.i);
+  });
+  document.addEventListener("change", e => {
+    const el = e.target;
+    if (el.dataset.status) return setStatus(+el.dataset.status, el.value);
+    if (el.dataset.t) saveField(el);
+  });
+
+  const drawer = $("#drawer");
+  drawer.addEventListener("input", e => {
+    const el = e.target;
+    if (el.tagName === "TEXTAREA" && el.dataset.t) {
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => saveField(el), 1000);   // notes save as you type
+    }
+  });
+  drawer.addEventListener("click", e => {
+    const tpl = e.target.closest("[data-tpl]");
+    if (tpl) return useTemplate(tpl.dataset.tpl);
+    const b = e.target.closest("[data-act]");
+    if (b) drawerAction(b.dataset.act, b);
+  });
+  drawer.addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      if (e.target.id === "log-body" || e.target.closest(".logform")) { e.preventDefault(); addLog(); }
+      const ev = e.target.closest(".ev[data-ev]");
+      if (ev) { e.preventDefault(); drawerAction("save-ev", { dataset: { id: ev.dataset.ev } }); }
+    }
+  });
+
+  $("#file-import").addEventListener("change", e => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) importFile(file);
+  });
+
+  document.addEventListener("keydown", e => {
+    const t = e.target;
+    const typing = t.matches("input, textarea, select, [contenteditable]");
+    if (e.key === "Escape") {
+      if (modalEl) { closeModal(); e.preventDefault(); }
+      else if (typing) t.blur();
+      else if (S.open) closeDrawer();
+      else if (S.q || S.filters.size || S.status) { S.q = ""; $("#search").value = ""; S.filters.clear(); S.status = null; renderMain(); }
+      return;
+    }
+    if (typing || e.ctrlKey || e.metaKey || e.altKey || modalEl) return;
+    const keys = {
+      n: () => openNew(),
+      "/": () => $("#search").focus(),
+      j: () => moveSel(1), ArrowDown: () => moveSel(1),
+      k: () => moveSel(-1), ArrowUp: () => moveSel(-1),
+      Enter: () => S.sel >= 0 && openRow(S.sel),
+      b: () => S.open && openBrief(S.open.cid, S.open.appId),
+      1: () => setView("applications"),
+      2: () => setView("companies"),
+      "?": () => showShortcuts(),
+    };
+    if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
+  });
+
+  // Save a note that's mid-edit if the tab is closed.
+  window.addEventListener("beforeunload", () => {
+    const el = document.activeElement;
+    if (el?.dataset?.t) {
+      const value = el.type === "checkbox" ? el.checked : el.value;
+      fetch(`/api/${el.dataset.t}/${el.dataset.id}`, { method: "PATCH", keepalive: true, headers: { "X-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ [el.dataset.f]: value }) });
+    }
+  });
+}
+
+(async function start() {
+  const theme = store("theme");
+  if (theme) document.documentElement.dataset.theme = theme;
+  wire();
+  try {
+    await reload();
+    renderMain();
+  } catch (err) {
+    document.querySelector(".wrap").innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>

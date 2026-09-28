@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launcher for Linux/macOS: put this folder on PATH, then run `jobs` from anywhere.
+ROOT="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
+exec python3 "$ROOT/jobs.py" "$@"
