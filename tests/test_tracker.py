@@ -156,6 +156,82 @@ class DbTests(unittest.TestCase):
         self.assertTrue(body.startswith(b"\xef\xbb\xbf"))
 
 
+PROJECTS = """\
+Project,Summary,Built with,GitHub,Live,My role,When,Impact,Stars
+Tracker,Job tracker app,"Python, SQLite",github.com/me/tracker,,Solo,2026,Used daily,12
+Blog,Static blog,Hugo,,https://me.dev,,,,
+,no name here,,,,,,,
+"""
+
+
+class ProfileAndProjectTests(unittest.TestCase):
+    def test_old_database_is_migrated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "old.sqlite3"
+            old = sqlite3.connect(path)
+            old.executescript(db.SCHEMA.split("CREATE TABLE IF NOT EXISTS profile")[0]
+                              .replace("    told             TEXT NOT NULL DEFAULT '[]',\n", "")
+                              .replace("    remind         INTEGER NOT NULL DEFAULT 0,\n", ""))
+            old.execute("INSERT INTO companies (name, created_at, updated_at) VALUES ('A', 'x', 'x')")
+            old.execute("INSERT INTO events (company_id, kind, event_date, created_at, updated_at) VALUES (1, 'interview', '2030-01-01', 'x', 'x')")
+            old.commit()
+            old.close()
+            conn = db.connect(path, init=True)
+            self.assertFalse(db.all_rows(conn, "events")[0]["remind"])  # existing events start without a reminder
+            self.assertEqual(len(db.all_rows(conn, "profile")), 1)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], db.SCHEMA_VERSION)
+            db.connect(path, init=True).close()  # running it again is harmless
+            conn.close()
+
+    def test_reminder_defaults(self):
+        conn = memory_db()
+        cid = db.insert(conn, "companies", {"name": "A"})["id"]
+        self.assertTrue(db.insert(conn, "events", {"company_id": cid, "kind": "interview"})["remind"])
+        self.assertFalse(db.insert(conn, "events", {"company_id": cid, "kind": "onboarding"})["remind"])
+        self.assertFalse(db.insert(conn, "events", {"company_id": cid, "kind": "interview", "remind": False})["remind"])
+        self.assertTrue(db.insert(conn, "events", {"company_id": cid, "kind": "call", "remind": True})["remind"])
+
+    def test_told_rows(self):
+        conn = memory_db()
+        cid = db.insert(conn, "companies", {"name": "A"})["id"]
+        rows = [{"label": " Salary ", "value": "will discuss"}, {"label": "", "value": ""}, ["Resume", "v3"]]
+        app = db.insert(conn, "applications", {"company_id": cid, "position": "Dev", "told": rows})
+        self.assertEqual(app["told"], [{"label": "Salary", "value": "will discuss"}, {"label": "Resume", "value": "v3"}])
+        with self.assertRaises(db.ValidationError):
+            db.update(conn, "applications", app["id"], {"told": "not json"})
+        cell = list(csv.reader(io.StringIO(exporter.applications_csv(conn))))[1][-1]
+        self.assertEqual(cell, "Salary: will discuss; Resume: v3")
+        self.assertEqual(importer.parse_told(cell), app["told"])
+
+    def test_profile_is_single(self):
+        conn = memory_db()
+        self.assertEqual(db.update(conn, "profile", 1, {"name": "Me", "skills": "Go, go, SQL"})["skills"], "Go, SQL")
+        with self.assertRaises(db.ValidationError):
+            db.insert(conn, "profile", {"name": "Two"})
+        with self.assertRaises(db.ValidationError):
+            db.delete(conn, "profile", 1)
+
+    def test_import_projects(self):
+        conn = memory_db()
+        dry = importer.import_projects(conn, PROJECTS, dry_run=True)
+        self.assertEqual((dry.rows, dry.created, dry.rows_skipped), (3, 2, 1))
+        self.assertEqual(db.all_rows(conn, "projects"), [])
+        importer.import_projects(conn, PROJECTS)
+        again = importer.import_projects(conn, PROJECTS)
+        self.assertEqual((again.created, again.updated), (0, 2))
+        tracker = db.all_rows(conn, "projects")[0]
+        self.assertEqual((tracker["tools"], tracker["repo_url"], tracker["role"], tracker["results"]),
+                         ("Python, SQLite", "github.com/me/tracker", "Solo", "Used daily"))
+        self.assertIn("Stars: 12", tracker["description"])
+        with self.assertRaises(db.ValidationError):
+            db.insert(conn, "projects", {"description": "no name"})
+        exported = list(csv.reader(io.StringIO(exporter.projects_csv(conn))))
+        self.assertEqual(exported[0], exporter.PROJECT_COLUMNS)
+        self.assertEqual(len(exported), 3)
+        with self.assertRaises(db.ValidationError):
+            importer.import_projects(conn, "Foo,Bar\n1,2\n")
+
+
 class ServerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -196,6 +272,13 @@ class ServerTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self.call("PATCH", f"/api/companies/{out['company_id']}", {"remote": "moon"})
         self.assertEqual(ctx.exception.code, 400)
+        req = urllib.request.Request(self.base + "/api/import-projects?dry=0", method="POST", data=PROJECTS.encode(),
+                                     headers={"X-Token": self.srv.token})
+        with urllib.request.urlopen(req) as res:
+            self.assertEqual(json.loads(res.read())["created"], 2)
+        self.assertEqual(len(self.call("GET", "/api/data")["projects"]), 2)
+        self.call("PATCH", "/api/profile/1", {"name": "Me"})
+        self.assertEqual(self.call("GET", "/api/data")["profile"][0]["name"], "Me")
         csv_bytes = self.call("GET", f"/export/companies.csv?t={self.srv.token}", token=False, raw=True)
         self.assertIn(b"Acme", csv_bytes)
         self.call("DELETE", f"/api/companies/{out['company_id']}")

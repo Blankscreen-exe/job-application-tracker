@@ -19,6 +19,18 @@ It runs in your browser, keeps everything in one file on your computer, and need
   the tools that come up most.
 - **Calendar.** A month view of interviews, onboarding, calls and other dated entries, plus joining dates.
   Click a day to add an event (company, which application, what, date and time), or an event to edit it.
+- **Reminders.** Tick "Set reminder" on an event (interviews are ticked by default) and it shows in
+  *Coming up*, the company panel and the dashboard's next 7 days. Unticked events stay on the calendar and in the log.
+- **What I told them.** Label/value rows on each application, such as the resume version you sent or the
+  salary you quoted, so you stay consistent. They show on the card, the brief and in email prompts.
+- **Write email.** Builds a prompt with everything the tracker knows (the role, company, people, history,
+  what you told them, your About me and projects) to paste into ChatGPT, Claude or any LLM: a follow-up,
+  a thank-you after an interview, a reply to a message, or anything else. Nothing is sent anywhere.
+- **Me.** Your About me and portfolio projects (add them one by one or import a CSV). **Write a message**
+  makes a prompt for a LinkedIn/Reddit comment or a DM pitch, not tied to any company.
+- **Duplicate warning.** Pasting a job link you've already saved tells you, with a link to the existing one.
+- **Mark as Ghosted.** Applications still at *Applied* with nothing for 30 days can be marked Ghosted in one go
+  from the dashboard, with Undo.
 - **Follow-ups.** Applications with no activity for 14 days (configurable) are flagged.
 - **Filters and search.** Urgent, remote, big tech, active, needs a follow-up, not applied yet, by status,
   plus search across everything.
@@ -97,14 +109,15 @@ Edit `data/config.json` (created on first run):
   "stale_days": 14,
   "upcoming_days": 14,
   "reminder_days": 7,
+  "ghosted_days": 30,
   "backups_to_keep": 14
 }
 ```
 
 ## Keyboard
 
-`n` new (an application, a company on the Companies tab, an event on the Calendar) · `/` search · `j`/`k` move · `Enter` open · `b` brief ·
-`1`–`4` Dashboard / Applications / Companies / Calendar · `←`/`→` change month on the Calendar · `Esc` close ·
+`n` new (an application, a company on Companies, an event on the Calendar, a project on Me) · `/` search · `j`/`k` move · `Enter` open · `b` brief ·
+`1`–`5` Dashboard / Applications / Companies / Calendar / Me · `←`/`→` change month on the Calendar · `Esc` close ·
 `Ctrl+Enter` save a form or add a log entry · `?` all shortcuts
 
 ## Privacy

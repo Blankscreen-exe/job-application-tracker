@@ -23,6 +23,8 @@ DEFAULTS: dict = {
     "upcoming_days": 14,
     # How far ahead the dashboard's reminders look.
     "reminder_days": 7,
+    # Applications still at the first status with nothing for this many days can be marked Ghosted in one go.
+    "ghosted_days": 30,
     # Daily database backups to keep.
     "backups_to_keep": 14,
 }

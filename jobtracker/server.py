@@ -159,6 +159,10 @@ class Handler(BaseHTTPRequestHandler):
                 dry_run=(query.get("dry") or ["0"])[0] == "1",
             )
             return self._json(200, result.as_dict())
+        if name == "import-projects" and method == "POST":
+            text = self._body().decode("utf-8-sig", errors="replace")
+            result = importer.import_projects(conn, text, dry_run=(query.get("dry") or ["0"])[0] == "1")
+            return self._json(200, result.as_dict())
         if name in db.TABLES:
             if len(parts) == 2 and method == "POST":
                 with conn:

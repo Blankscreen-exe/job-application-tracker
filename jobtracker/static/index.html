@@ -237,6 +237,7 @@ select.st option { color: var(--ink); background: var(--bg); }
 .logrow { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; align-items: flex-end; }
 .logrow select, .logrow input { width: auto; flex: 1 1 110px; }
 .logrow .btn { flex: none; }
+.logrow .check { flex: none; white-space: nowrap; font-size: 13px; }
 .tl-group { font-size: 11px; font-weight: 700; color: var(--muted); margin: 16px 0 2px; }
 .ev { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--rule); }
 .tl-group + .ev { border-top: 0; }
@@ -353,6 +354,31 @@ select.st option { color: var(--ink); background: var(--bg); }
 }
 #tip[hidden] { display: none; }
 
+/* what I told them */
+.told { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 3px 0 0; }
+.told dt { font-weight: 700; }
+.told dd { margin: 0; overflow-wrap: anywhere; }
+.told-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: 12px; align-items: end; margin-bottom: 4px; }
+.told-add { align-self: flex-start; padding-left: 0; color: var(--muted); }
+
+/* me */
+.me { max-width: 980px; }
+.me-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 6px solid var(--ink); padding: 12px 0 14px; }
+.me-head h2 { flex: 1; margin: 0; font-size: 34px; letter-spacing: -.045em; line-height: 1; }
+.me .headline { font-size: 18px; font-weight: 700; margin: 0 0 6px; letter-spacing: -.01em; }
+.sech-a { display: flex; gap: 8px; }
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.projects .eform { grid-column: 1 / -1; margin: 0; }
+.pcard .tools { margin-top: 8px; }
+.pcard .plinks { display: flex; gap: 14px; margin-top: 8px; }
+.pcard .plinks .ext, .me .metaline .ext { margin-left: 0; }
+
+/* prompts */
+.prompt-out { font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; background: var(--hover); padding: 10px 12px; border: 0; }
+.pform .fld textarea { min-height: 60px; }
+.actions .pcount { font-size: 12px; align-self: center; }
+[hidden] { display: none !important; }
+
 /* calendar */
 .cal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 6px solid var(--ink); padding: 12px 0 14px; }
 .cal-head h2 { margin: 0 12px 0 0; font-size: 34px; letter-spacing: -.045em; line-height: 1; flex: 1; }
@@ -375,6 +401,8 @@ select.st option { color: var(--ink); background: var(--bg); }
 .cev.interview { background: var(--accent); color: #fff; box-shadow: none; }
 .cev.interview span { color: #fff; }
 .cev.past { opacity: .6; }
+.cev.rem b::after, .rem-key::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-left: 5px; vertical-align: 2px; }
+.cal-legend .rem-key::before { display: none; }
 .cal-agenda { display: none; }
 .cal-legend { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
 .cal-legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; background: var(--c); margin-right: 6px; }
@@ -393,6 +421,9 @@ select.st option { color: var(--ink); background: var(--bg); }
   .cev.interview { background: var(--accent); }
   .cev b, .cev span { display: none; }
   .cal-agenda { display: block; margin-top: 18px; }
+  .told-row { grid-template-columns: 1fr auto; }
+  .told-row [name=told_value] { grid-column: 1; }
+  .me-head h2 { font-size: 26px; }
 }
 @media (max-width: 720px) {
   .top { padding: 16px 16px 10px; gap: 12px 16px; }
@@ -418,6 +449,7 @@ select.st option { color: var(--ink); background: var(--bg); }
     <button data-view="applications">Applications</button>
     <button data-view="companies">Companies</button>
     <button data-view="calendar">Calendar</button>
+    <button data-view="me">Me</button>
   </div>
   <input id="search" type="search" placeholder="Search everything  ( / )" autocomplete="off">
   <div class="spacer"></div>
@@ -429,6 +461,7 @@ select.st option { color: var(--ink); background: var(--bg); }
       <hr>
       <a data-export="companies.csv" download>Export companies (CSV)</a>
       <a data-export="applications.csv" download>Export applications (CSV)</a>
+      <a data-export="projects.csv" download>Export projects (CSV)</a>
       <a data-export="backup.json" download>Full backup (JSON)</a>
       <hr>
       <button data-menu="theme">Switch light / dark</button>
@@ -446,13 +479,16 @@ select.st option { color: var(--ink); background: var(--bg); }
   </div>
   <section id="calendar" hidden></section>
   <section id="dashboard" class="dash" hidden></section>
+  <section id="me" class="me" hidden></section>
 </div>
-<div class="hint"><kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>b</kbd> brief · <kbd>1</kbd>–<kbd>4</kbd> views · <kbd>Esc</kbd> close · <kbd>?</kbd> help</div>
+<div class="hint"><kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>b</kbd> brief · <kbd>1</kbd>–<kbd>5</kbd> views · <kbd>Esc</kbd> close · <kbd>?</kbd> help</div>
 <div id="tip" hidden></div>
 
 <aside id="drawer" class="drawer" hidden></aside>
 <input type="file" id="file-import" accept=".csv,text/csv" hidden>
+<input type="file" id="file-projects" accept=".csv,text/csv" hidden>
 <datalist id="co-list"></datalist>
+<datalist id="told-labels"></datalist>
 <div id="toast"></div>
 
 <script>
@@ -479,7 +515,7 @@ const TEMPLATES = {
   note: { kind: "note", body: "", label: "Note" },
 };
 
-const VIEWS = ["dashboard", "applications", "companies", "calendar"];
+const VIEWS = ["dashboard", "applications", "companies", "calendar", "me"];
 const isList = () => S.view === "applications" || S.view === "companies";
 
 function store(key, value) {
@@ -490,7 +526,7 @@ function store(key, value) {
 }
 
 const S = {
-  data: null, view: "dashboard", cal: null,   // the tracker always opens on the dashboard
+  data: null, view: "dashboard", cal: null, meEdit: null,   // the tracker always opens on the dashboard
   filters: new Set(), status: null, q: "", rows: [], sel: -1, open: null,
   sort: { applications: { key: "applied", dir: -1 }, companies: { key: "activity", dir: -1 } },
 };
@@ -529,6 +565,9 @@ function index() {
   S.eventsBy = group(d.events);
   S.peopleBy = group(d.contacts);
   $("#co-list").innerHTML = d.companies.map(c => `<option value="${esc(c.name)}">`).join("");
+  const labels = new Set(["Resume", "Salary", "Notice period", "Available from", "Location", "Visa / work permit"]);
+  for (const a of d.applications) for (const r of a.told) if (r.label) labels.add(r.label);
+  $("#told-labels").innerHTML = [...labels].map(l => `<option value="${esc(l)}">`).join("");
 }
 
 function replaceRow(table, row) {
@@ -572,7 +611,9 @@ function isUpcoming(e) {
   const now = new Date().toTimeString().slice(0, 5);
   return SCHEDULED.includes(e.kind) || (!!e.event_time && e.event_time >= now);
 }
-const upcomingFor = cid => coEvents(cid).filter(isUpcoming).sort(byWhen);
+// Reminders: upcoming events you ticked "Set reminder" on. Only these show in the Coming up lists.
+const isReminder = e => !!e.remind && isUpcoming(e);
+const upcomingFor = cid => coEvents(cid).filter(isReminder).sort(byWhen);
 const latestApp = cid => coApps(cid).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id)[0];
 const isActive = a => S.data.config.active_statuses.includes(a.status);
 const splitTools = s => (s || "").split(",").map(t => t.trim()).filter(Boolean);
@@ -588,7 +629,7 @@ function appActivity(a) {
 }
 function isStale(a) {
   const cfg = S.data.config;
-  if (!cfg.stale_statuses.includes(a.status) || upcomingFor(a.company_id).length) return false;
+  if (!cfg.stale_statuses.includes(a.status) || coEvents(a.company_id).some(isUpcoming)) return false;
   return daysSince(appActivity(a)) > cfg.stale_days;
 }
 function coActivity(cid) {
@@ -659,7 +700,7 @@ function haystack(c, a) {
   const people = (S.peopleBy.get(c.id) || []).map(p => `${p.name} ${p.role} ${p.notes}`);
   const parts = [c.name, c.website, c.about, c.notes, c.refs, ...people];
   const apps = a ? [a] : coApps(c.id);
-  for (const x of apps) parts.push(x.position, x.tools, x.status, x.comments, x.responsibilities, x.offer);
+  for (const x of apps) parts.push(x.position, x.tools, x.status, x.comments, x.responsibilities, x.offer, ...x.told.map(r => `${r.label} ${r.value}`));
   return parts.join(" ").toLowerCase();
 }
 
@@ -707,7 +748,7 @@ function renderSummary() {
 
 function renderUpcoming() {
   const cfg = S.data.config, box = $("#upcoming");
-  const list = S.data.events.filter(e => isUpcoming(e) && daysSince(e.event_date) >= -cfg.upcoming_days).sort(byWhen);
+  const list = S.data.events.filter(e => isReminder(e) && daysSince(e.event_date) >= -cfg.upcoming_days).sort(byWhen);
   box.hidden = !list.length;
   if (!list.length) return;
   box.innerHTML = `<h2>Coming up</h2>` + list.slice(0, 8).map(e => {
@@ -755,6 +796,8 @@ function renderMain() {
   $("#list-view").hidden = !isList();
   $("#calendar").hidden = S.view !== "calendar";
   $("#dashboard").hidden = S.view !== "dashboard";
+  $("#me").hidden = S.view !== "me";
+  if (S.view === "me") return renderMe();
   if (S.view === "calendar") return renderCalendar();
   if (S.view === "dashboard") return renderDashboard();
   buildRows();
@@ -815,7 +858,7 @@ function calItems(from, to) {
 
 // What's coming up in the next `days` days, today's already-past entries excluded.
 const reminders = days => calItems(S.data.today, dayStr(dayNum(S.data.today) + days))
-  .filter(it => it.ev ? isUpcoming(it.ev) : true);
+  .filter(it => it.ev ? isReminder(it.ev) : true);
 
 // ---------- dashboard --------------------------------------------------------------------------
 
@@ -831,9 +874,10 @@ function renderDashboard() {
   const replied = sent.filter(heardBack);
   const week = apps.filter(a => a.date_applied && daysSince(a.date_applied) < 7 && daysSince(a.date_applied) >= 0).length;
   const soon = reminders(cfg.reminder_days);
-  const interviews = soon.filter(it => it.kind === "interview").length;
+  const interviews = calItems(d.today, dayStr(dayNum(d.today) + cfg.reminder_days)).filter(it => it.kind === "interview" && isUpcoming(it.ev)).length;
   const stale = apps.filter(isStale).sort((a, b) => appActivity(a).localeCompare(appActivity(b)));
   const offers = apps.filter(a => a.status === "Offer").length;
+  const ghost = ghostable();
   const kpi = (n, label, sub = "", hot = false) => `<div class="kpi ${hot ? "hot" : ""}"><b>${n}</b><span>${label}</span>${sub ? `<em>${sub}</em>` : ""}</div>`;
 
   $("#dashboard").innerHTML = `
@@ -853,7 +897,7 @@ function renderDashboard() {
     <section class="panel"><h2><span>By status</span><span class="muted">click to filter</span></h2>${statusDonut()}</section>
     <section class="panel"><h2><span>Heard back, by month applied</span><span class="muted">recent months are still settling</span></h2>${responseTrend()}</section>
     <section class="panel"><h2><span>Most asked-for tools</span><span class="muted">across all applications</span></h2>${toolBars()}</section>
-    <section class="panel wide"><h2><span>Needs a follow-up</span><span class="muted">oldest first</span></h2>
+    <section class="panel wide"><h2><span>Needs a follow-up</span><span>${ghost.length ? `<button class="btn small" data-ghost-all title="Still at ${esc(cfg.statuses[0])} with nothing for ${cfg.ghosted_days}+ days">Mark ${ghost.length} as Ghosted</button>` : `<span class="muted">oldest first</span>`}</span></h2>
       ${stale.length ? stale.slice(0, 8).map(a => `<div class="mini" data-open="${a.company_id}" data-open-app="${a.id}">
           <span><b>${esc(S.co.get(a.company_id).name)}</b> <span class="muted">${esc(a.position)}</span></span>
           <span class="muted">${ago(daysSince(appActivity(a)))}</span></div>`).join("")
@@ -889,6 +933,30 @@ function responseTrend() {
   return `<div class="trend" role="img" aria-label="Heard back by month: ${pts.map(p => `${label(p.k)} ${p.n ? pct(p.yes, p.n) + "%" : "none"}`).join(", ")}">
       ${grid}<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${d}" vector-effect="non-scaling-stroke"></path></svg><div class="cols">${cols}</div></div>
     <div class="trend-x">${pts.map(p => `<span>${label(p.k)}</span>`).join("")}</div>`;
+}
+
+// Still at the first status, nothing logged for `ghosted_days` and nothing scheduled.
+const ghostable = () => {
+  const cfg = S.data.config;
+  if (!cfg.statuses.includes("Ghosted")) return [];
+  return S.data.applications.filter(a => a.status === cfg.statuses[0] && daysSince(appActivity(a)) >= cfg.ghosted_days
+    && !coEvents(a.company_id).some(isUpcoming));
+};
+
+async function markGhosted() {
+  const list = ghostable(), cfg = S.data.config;
+  if (!list.length) return;
+  const names = list.slice(0, 12).map(a => "  • " + describeApp(a)).join("\n") + (list.length > 12 ? `\n  …and ${list.length - 12} more` : "");
+  if (!confirm(`Mark ${plural(list.length, "application")} as Ghosted? Nothing has happened on these for ${cfg.ghosted_days}+ days:\n\n${names}`)) return;
+  try {
+    for (const a of list) await api("PATCH", `/api/applications/${a.id}`, { status: "Ghosted" });
+    await reload(); renderMain();
+    toast(`Marked ${plural(list.length, "application")} as Ghosted`, "", { label: "Undo", fn: async () => {
+      for (const a of list) await api("PATCH", `/api/applications/${a.id}`, { status: a.status });
+      await reload(); renderMain();
+      toast("Undone");
+    } });
+  } catch (err) { await reload(); renderMain(); toast(err.message, "error"); }
 }
 
 function reminderRow(it) {
@@ -981,9 +1049,9 @@ function renderCalendar() {
   const chip = it => {
     const name = S.co.get(it.cid)?.name || "";
     const past = it.date < today || (it.date === today && it.time && !isUpcoming(it.ev || it));
-    const full = `${it.time ? fmtTime(it.time) + " · " : ""}${kindLabel(it.kind)} · ${name}${it.body ? "\n" + it.body : ""}`;
+    const full = `${it.time ? fmtTime(it.time) + " · " : ""}${kindLabel(it.kind)} · ${name}${it.ev?.remind ? " · reminder set" : ""}${it.body ? "\n" + it.body : ""}`;
     const target = it.ev ? `data-cal-ev="${it.ev.id}"` : `data-cal-join="${it.appId}" data-cid="${it.cid}"`;
-    return `<button class="cev ${it.kind} ${past ? "past" : ""}" style="--c:${kindColor(it.kind)}" ${target} title="${esc(full)}">
+    return `<button class="cev ${it.kind} ${past ? "past" : ""} ${it.ev?.remind ? "rem" : ""}" style="--c:${kindColor(it.kind)}" ${target} title="${esc(full)}">
       <b>${it.time ? fmtTime(it.time) + " " : ""}${esc(name)}</b><span>${esc(kindLabel(it.kind))}${it.body ? " · " + esc(it.body) : ""}</span></button>`;
   };
   let cells = "";
@@ -1003,6 +1071,7 @@ function renderCalendar() {
     </div>
     <div class="cal-grid">${dows.map(d => `<div class="cal-dow">${esc(d)}</div>`).join("")}${cells}</div>
     <div class="cal-legend">${["interview", "onboarding", "call", "email", "note", "joining"].map(k => `<span style="--c:${k === "interview" ? "var(--accent)" : kindColor(k)}">${kindLabel(k)}</span>`).join("")}
+      <span class="rem-key">Reminder set</span>
       <span class="muted" style="margin-left:auto">Click a day to add an event</span></div>
     <div class="cal-agenda upcoming">${month.length ? `<h2>This month</h2>` + month.map(reminderRow).join("") : ""}</div>`;
 }
@@ -1027,6 +1096,7 @@ function openEventForm({ id, date, cid } = {}) {
         ${fld("Time", `<input type="time" name="time" value="${esc(ev?.event_time || "")}">`)}
       </div>
       ${fld("Details", `<textarea name="body" rows="2" placeholder="e.g. Technical round with Sam, Zoom link in the invite">${esc(ev?.body || "")}</textarea>`)}
+      <div class="checks">${checkbox("remind", ev ? ev.remind : remindByDefault(kind), `Set reminder <span class="muted">(shows in Coming up and the dashboard's next ${S.data.config.reminder_days} days)</span>`)}</div>
       <div class="actions">
         ${ev ? `<button type="button" class="btn danger" id="evf-del" style="margin-right:auto">Delete</button><button type="button" class="btn" id="evf-open">Open company</button>` : ""}
         <button type="button" class="btn" data-close>Cancel</button>
@@ -1044,13 +1114,14 @@ function openEventForm({ id, date, cid } = {}) {
   };
   F.name.addEventListener("input", syncApps);
   syncApps();
+  followKind(F.kind, F.remind);
 
   const save = async () => {
     const name = F.name.value.trim();
     if (!ev && !name) { F.name.focus(); return toast("Which company is it with?", "error"); }
     if (!ev && !findCo()) { F.name.focus(); return toast(`${name} isn't tracked yet. Add the company first.`, "error"); }
     if (!F.date.value) { F.date.focus(); return toast("Pick a date", "error"); }
-    const body = { application_id: F.app.value ? +F.app.value : null, kind: F.kind.value, body: F.body.value, event_date: F.date.value, event_time: F.time.value };
+    const body = { application_id: F.app.value ? +F.app.value : null, kind: F.kind.value, body: F.body.value, event_date: F.date.value, event_time: F.time.value, remind: F.remind.checked };
     try {
       if (ev) await api("PATCH", `/api/events/${ev.id}`, body);
       else {
@@ -1142,6 +1213,7 @@ function renderDrawer(keepScroll) {
   </div>`;
 
   $$("textarea", drawer).forEach(autosize);
+  if ($("#log-kind")) followKind($("#log-kind"), $("#log-remind"));
   if (draft) restoreLogDraft(draft);
   if (formDraft && formDraft.key === edit) restoreEditDraft(formDraft);
   const body = $(".dbody", drawer);
@@ -1195,13 +1267,14 @@ function appCard(a, highlight) {
     <div class="card-h"><h4>${esc(a.position || "Untitled role")}</h4>${statusSelect(a)}</div>
     ${metaline(meta)}
     ${splitTools(a.tools).length ? `<div class="tools">${toolChips(a.tools)}</div>` : ""}
+    ${toldView(a.told)}
     ${ro("Responsibilities", a.responsibilities)}${ro("Comments", a.comments)}
-    <div class="card-a"><button class="btn small ghost" data-act="edit" data-edit="app:${a.id}">Edit</button><button class="btn small ghost danger" data-act="del-app" data-id="${a.id}">Delete</button></div>
+    <div class="card-a"><button class="btn small ghost" data-act="prompt" data-id="${a.id}" title="Copy a prompt for ChatGPT, Claude or any LLM">Write email</button><button class="btn small ghost" data-act="edit" data-edit="app:${a.id}">Edit</button><button class="btn small ghost danger" data-act="del-app" data-id="${a.id}">Delete</button></div>
   </div>`;
 }
 
 function appForm(a) {
-  const v = a || { position: "", job_url: "", status: S.data.config.statuses[0] || "", date_applied: S.data.today, offer: "", joining_date: "", tools: "", responsibilities: "", comments: "" };
+  const v = a || { position: "", job_url: "", status: S.data.config.statuses[0] || "", date_applied: S.data.today, offer: "", joining_date: "", tools: "", responsibilities: "", comments: "", told: [] };
   return `<form class="eform" data-edit="${a ? `app:${a.id}` : "app:new"}" autocomplete="off">
     <div class="grid2">
       ${fld("Position", `<input type="text" name="position" value="${esc(v.position)}" placeholder="e.g. Backend Engineer">`)}
@@ -1216,9 +1289,22 @@ function appForm(a) {
     ${fld("Tools", `<input type="text" name="tools" value="${esc(v.tools)}" placeholder="Python, AWS, Figma">`)}
     ${fld("Responsibilities", `<textarea name="responsibilities" rows="2" placeholder="What the role involves">${esc(v.responsibilities)}</textarea>`)}
     ${fld("Comments", `<textarea name="comments" rows="1">${esc(v.comments)}</textarea>`)}
+    <div class="fld"><span>What I told them <span class="muted">(resume version, salary, notice period, anything)</span></span>
+      <div class="told-rows">${(v.told?.length ? v.told : [{ label: "", value: "" }]).map(toldRow).join("")}</div>
+      <button type="button" class="btn small ghost told-add" data-act="told-add">+ Add row</button></div>
     ${formButtons()}
   </form>`;
 }
+
+const toldRow = r => `<div class="told-row">
+  <input type="text" name="told_label" list="told-labels" value="${esc(r.label)}" placeholder="e.g. Salary">
+  <input type="text" name="told_value" value="${esc(r.value)}" placeholder="e.g. will discuss in interview">
+  <button type="button" class="btn small ghost" data-act="told-del" title="Remove row">✕</button></div>`;
+const toldView = rows => rows?.length ? `<div class="ro"><span>What I told them</span><dl class="told">${rows.map(r =>
+  `<dt>${esc(r.label || "—")}</dt><dd>${esc(r.value)}</dd>`).join("")}</dl></div>` : "";
+// The told rows of a form, skipping empty ones.
+const toldRows = form => $$(".told-row", form).map(row => ({ label: $("[name=told_label]", row).value.trim(), value: $("[name=told_value]", row).value.trim() }))
+  .filter(r => r.label || r.value);
 
 function personCard(p) {
   return `<div class="pcard">
@@ -1243,15 +1329,27 @@ function personForm(p) {
   </form>`;
 }
 
+// A form's named fields as an object; label/value rows become a `told` list.
+function formData(form) {
+  const data = {};
+  for (const el of form.elements) {
+    if (el.name && !el.name.startsWith("told_")) data[el.name] = el.type === "checkbox" ? el.checked : el.value;
+  }
+  if ($(".told-rows", form)) data.told = toldRows(form);
+  return data;
+}
+
 // Keep what's typed into an open form when the panel redraws (e.g. after a status change).
 function editDraft() {
   const f = $("#drawer .eform");
-  return f ? { key: f.dataset.edit, values: [...f.elements].filter(el => el.name).map(el => [el.name, el.type === "checkbox" ? el.checked : el.value]) } : null;
+  return f ? { key: f.dataset.edit, data: formData(f) } : null;
 }
 function restoreEditDraft(d) {
   const f = $("#drawer .eform");
-  for (const [name, value] of d.values) {
-    const el = f?.elements[name];
+  if (!f) return;
+  for (const [name, value] of Object.entries(d.data)) {
+    if (name === "told") { $(".told-rows", f).innerHTML = (value.length ? value : [{ label: "", value: "" }]).map(toldRow).join(""); continue; }
+    const el = f.elements[name];
     if (el) el.type === "checkbox" ? (el.checked = value) : (el.value = value);
   }
 }
@@ -1270,12 +1368,13 @@ function cancelEdit() {
 
 async function saveEdit(form) {
   const [kind, id] = form.dataset.edit.split(":"), cid = S.open.cid;
-  const data = Object.fromEntries([...form.elements].filter(el => el.name).map(el => [el.name, el.type === "checkbox" ? el.checked : el.value]));
+  const data = formData(form);
   if ((kind === "person" || kind === "company") && !data.name.trim()) {
     form.elements.name.focus();
     return toast(kind === "person" ? "A person needs a name" : "A company needs a name", "error");
   }
   const table = { company: "companies", app: "applications", person: "contacts" }[kind];
+  if (kind === "app" && !confirmNotDuplicate(data.job_url, id === "new" ? null : +id)) return;
   try {
     const row = kind === "company" ? await api("PATCH", `/api/companies/${cid}`, data)
       : id === "new" ? await api("POST", `/api/${table}`, { ...data, company_id: cid })
@@ -1285,6 +1384,13 @@ async function saveEdit(form) {
     await reload(); renderMain(); renderDrawer(true);
     toast("Saved");
   } catch (err) { toast(err.message, "error"); }
+}
+
+const remindByDefault = kind => kind === "interview";
+// Tick "Set reminder" when the kind changes to one that has it by default, until you tick or untick it yourself.
+function followKind(kindEl, remindEl) {
+  kindEl.addEventListener("change", () => { if (!remindEl.dataset.touched) remindEl.checked = remindByDefault(kindEl.value); });
+  remindEl.addEventListener("change", () => { remindEl.dataset.touched = "1"; });
 }
 
 function logForm(apps, appId) {
@@ -1301,6 +1407,7 @@ function logForm(apps, appId) {
       ${appSel}
       <input type="date" id="log-date" title="When it happens or happened (optional)">
       <input type="time" id="log-time" title="Time (optional)">
+      <label class="check" title="Show it in Coming up and on the dashboard"><input type="checkbox" id="log-remind">Set reminder</label>
       <button class="btn primary" data-act="add-log">Add <kbd>Ctrl+Enter</kbd></button>
     </div>
   </div>`;
@@ -1308,10 +1415,12 @@ function logForm(apps, appId) {
 
 function logDraft() {
   const b = $("#log-body");
-  return b ? { body: b.value, kind: $("#log-kind").value, date: $("#log-date").value, time: $("#log-time").value } : null;
+  return b ? { body: b.value, kind: $("#log-kind").value, date: $("#log-date").value, time: $("#log-time").value, remind: $("#log-remind").checked, touched: !!$("#log-remind").dataset.touched } : null;
 }
 function restoreLogDraft(d) {
   $("#log-body").value = d.body; $("#log-kind").value = d.kind; $("#log-date").value = d.date; $("#log-time").value = d.time;
+  $("#log-remind").checked = d.remind;
+  if (d.touched) $("#log-remind").dataset.touched = "1";
 }
 
 function timelineItems(cid) {
@@ -1334,7 +1443,7 @@ function timeline(cid, apps) {
     return `<div class="ev ${future.includes(e) ? "future" : ""}" style="--c:${color}" ${e.id ? `data-ev="${e.id}"` : ""}>
       <div class="dot"></div>
       <div class="evmain">
-        <div class="evmeta"><span class="k">${esc(KINDS[e.kind] || e.kind)}</span><span>${fmtDate(e.when, { weekday: true })}${e.event_time ? " · " + esc(fmtTime(e.event_time)) : ""}</span><span>· ${ago(daysSince(e.when))}</span>${tag}</div>
+        <div class="evmeta"><span class="k">${esc(KINDS[e.kind] || e.kind)}</span><span>${fmtDate(e.when, { weekday: true })}${e.event_time ? " · " + esc(fmtTime(e.event_time)) : ""}</span><span>· ${ago(daysSince(e.when))}</span>${tag}${e.remind && e.id && isUpcoming(e) ? `<span class="tag">Reminder</span>` : ""}</div>
         <div class="evbody">${esc(e.body)}</div>
       </div>
       <div class="evact">${e.id ? `<button data-act="edit-ev" data-id="${e.id}">Edit</button><button data-act="del-ev" data-id="${e.id}" title="Delete">✕</button>` : ""}</div>
@@ -1351,6 +1460,7 @@ function editEvent(id) {
     <div class="logrow">
       <select id="ev-kind-${id}">${kinds.map(([k, l]) => `<option value="${k}" ${k === e.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
       <input type="date" id="ev-date-${id}" value="${esc(e.event_date)}"><input type="time" id="ev-time-${id}" value="${esc(e.event_time)}">
+      <label class="check"><input type="checkbox" id="ev-remind-${id}" ${e.remind ? "checked" : ""}>Set reminder</label>
       <button class="btn small primary" data-act="save-ev" data-id="${id}">Save</button><button class="btn small" data-act="cancel-ev">Cancel</button>
     </div>`;
   const ta = $(`#ev-body-${id}`);
@@ -1371,12 +1481,12 @@ async function addLog() {
   try {
     await api("POST", "/api/events", {
       company_id: S.open.cid, application_id: appVal ? +appVal : null,
-      kind: $("#log-kind").value, body, event_date: date, event_time: time,
+      kind: $("#log-kind").value, body, event_date: date, event_time: time, remind: $("#log-remind").checked,
     });
     await reload();
     renderMain();
     renderDrawer(true);
-    $("#log-body").value = ""; $("#log-date").value = ""; $("#log-time").value = ""; $("#log-kind").value = "note";
+    $("#log-body").value = ""; $("#log-date").value = ""; $("#log-time").value = ""; $("#log-kind").value = "note"; $("#log-remind").checked = false;
     toast("Logged");
   } catch (err) { toast(err.message, "error"); }
 }
@@ -1384,6 +1494,7 @@ async function addLog() {
 function useTemplate(key) {
   const t = TEMPLATES[key], ta = $("#log-body");
   $("#log-kind").value = t.kind;
+  $("#log-kind").dispatchEvent(new Event("change"));
   ta.value = t.body;
   if (t.today && !$("#log-date").value) $("#log-date").value = S.data.today;
   if (SCHEDULED.includes(key)) $("#log-date").value = "";
@@ -1400,6 +1511,18 @@ async function drawerAction(act, el) {
       case "brief": return openBrief(cid, S.open.appId);
       case "edit": return openEdit(el.dataset.edit);
       case "cancel-edit": return cancelEdit();
+      case "told-add": {
+        const rows = el.closest(".fld").querySelector(".told-rows");
+        rows.insertAdjacentHTML("beforeend", toldRow({ label: "", value: "" }));
+        return rows.lastElementChild.querySelector("input").focus();
+      }
+      case "told-del": {
+        const rows = el.closest(".told-rows");
+        el.closest(".told-row").remove();
+        if (!rows.children.length) rows.innerHTML = toldRow({ label: "", value: "" });
+        return;
+      }
+      case "prompt": return openAppPrompt(+el.dataset.id);
       case "del-app":
         if (!confirm("Delete this application? Its log entries stay with the company.")) return;
         await api("DELETE", `/api/applications/${el.dataset.id}`);
@@ -1417,7 +1540,7 @@ async function drawerAction(act, el) {
         const id = el.dataset.id;
         await api("PATCH", `/api/events/${id}`, {
           body: $(`#ev-body-${id}`).value, kind: $(`#ev-kind-${id}`).value,
-          event_date: $(`#ev-date-${id}`).value, event_time: $(`#ev-time-${id}`).value,
+          event_date: $(`#ev-date-${id}`).value, event_time: $(`#ev-time-${id}`).value, remind: $(`#ev-remind-${id}`).checked,
         });
         return refresh();
       }
@@ -1514,6 +1637,7 @@ function openQuickAdd(prefill = {}) {
         ${fld("Company", `<input type="text" name="name" list="co-list" required>`)}
         ${fld("Position", `<input type="text" name="position" placeholder="e.g. Backend Engineer">`)}
       </div>
+      <div class="cohint" id="qa-dup"></div>
       <div class="cohint" id="qa-hint"></div>
       <div class="grid3">
         ${fld("Status", `<select name="status">${statusOptions(cfg.statuses[0])}</select>`)}
@@ -1559,6 +1683,20 @@ function openQuickAdd(prefill = {}) {
     }
     form.dataset.existing = ex ? "1" : "";
   };
+  const dupHint = $("#qa-dup", m);
+  const syncDup = () => {
+    const dup = findDuplicate(F.job_url.value);
+    dupHint.innerHTML = dup ? `<b>Already saved:</b> ${esc(describeApp(dup))}. <a href="#" data-dup-open="${dup.id}">Open existing</a>` : "";
+  };
+  dupHint.addEventListener("click", e => {
+    const a = e.target.closest("[data-dup-open]");
+    if (!a) return;
+    e.preventDefault();
+    const dup = findRow("applications", +a.dataset.dupOpen);
+    closeModal();
+    openDrawer(dup.company_id, dup.id);
+  });
+  F.job_url.addEventListener("input", syncDup);
   F.job_url.addEventListener("input", () => {
     const g = guessFromUrl(F.job_url.value);
     if (!g) return;
@@ -1572,6 +1710,7 @@ function openQuickAdd(prefill = {}) {
 
   const save = async (another) => {
     if (!F.name.value.trim()) { F.name.focus(); return toast("Company name is needed", "error"); }
+    if (!confirmNotDuplicate(F.job_url.value)) return;
     const payload = {
       company: { name: F.name.value, website: F.website.value, remote: F.remote.value, is_big_tech: F.is_big_tech.checked, urgent: F.urgent.checked },
       application: { position: F.position.value, job_url: F.job_url.value, tools: F.tools.value, date_applied: F.date_applied.value, status: F.status.value, comments: F.comments.value },
@@ -1584,7 +1723,7 @@ function openQuickAdd(prefill = {}) {
       if (another) {
         for (const k of ["job_url", "name", "position", "tools", "comments", "website"]) F[k].value = "";
         F.is_big_tech.checked = F.urgent.checked = false; F.remote.value = "";
-        autoName = false; syncCompany();
+        autoName = false; syncCompany(); syncDup();
         F.job_url.focus();
       } else closeModal();
     } catch (err) { toast(err.message, "error"); }
@@ -1597,8 +1736,30 @@ function openQuickAdd(prefill = {}) {
   if (prefill.name) F.name.dispatchEvent(new Event("input"));
 }
 
-// The New button and `n` add a company on the Companies tab, an event on the Calendar, an application everywhere else.
-const openNew = () => S.view === "companies" ? openCompanyForm() : S.view === "calendar" ? openEventForm() : openQuickAdd();
+// Job links compared loosely: no scheme, www, tracking parameters, fragment or trailing slash.
+function normUrl(url) {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw);
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_|ref$|source$|src$|trk)/i.test(k)) u.searchParams.delete(k);
+    return (u.hostname.replace(/^www\./, "") + u.pathname.replace(/\/+$/, "") + (u.searchParams.toString() ? "?" + u.searchParams : "")).toLowerCase();
+  } catch { return raw.toLowerCase(); }
+}
+const findDuplicate = (url, exceptId = null) => {
+  const n = normUrl(url);
+  return n ? S.data.applications.find(a => a.id !== exceptId && normUrl(a.job_url) === n) : null;
+};
+const describeApp = a => `${S.co.get(a.company_id).name} · ${a.position || "Untitled"}${a.date_applied ? `, applied ${fmtDate(a.date_applied)}` : ""}${a.status ? ` (${a.status})` : ""}`;
+function confirmNotDuplicate(url, exceptId = null) {
+  const dup = findDuplicate(url, exceptId);
+  return !dup || confirm(`You already saved this job link:\n${describeApp(dup)}\n\nSave anyway?`);
+}
+
+// The New button and `n` add a company on the Companies tab, an event on the Calendar, a project on Me,
+// an application everywhere else.
+const openNew = () => S.view === "companies" ? openCompanyForm() : S.view === "calendar" ? openEventForm()
+  : S.view === "me" ? openMeEdit("project:new") : openQuickAdd();
 
 function openCompanyForm() {
   const m = openModal(`
@@ -1704,9 +1865,9 @@ async function importFile(file) {
 
 function showShortcuts() {
   const m = openModal(`<h2>Keyboard shortcuts</h2><div class="shortcuts">
-    <kbd>n</kbd><span>New application (a company on the Companies tab, an event on the Calendar)</span><kbd>/</kbd><span>Search</span>
+    <kbd>n</kbd><span>New application (a company on Companies, an event on the Calendar, a project on Me)</span><kbd>/</kbd><span>Search</span>
     <kbd>j</kbd> <kbd>k</kbd><span>Move down / up the list</span><kbd>Enter</kbd><span>Open the selected row</span>
-    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd>–<kbd>4</kbd><span>Dashboard / Applications / Companies / Calendar</span>
+    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd>–<kbd>5</kbd><span>Dashboard / Applications / Companies / Calendar / Me</span>
     <kbd>←</kbd> <kbd>→</kbd><span>Previous / next month on the Calendar</span>
     <kbd>Ctrl+Enter</kbd><span>Save the form, or add the log entry</span><kbd>Esc</kbd><span>Leave a field, cancel an edit, close</span>
   </div><div class="actions"><button class="btn" data-close>Close</button></div>`);
@@ -1896,6 +2057,7 @@ function drawBrief(canvas, cid, appId) {
       app.offer && T(`Offer: ${app.offer}`, { size: 16, weight: 700, gap: 12 }),
       app.joining_date && T(`Joining ${fmtDate(app.joining_date, { year: true })}`, { size: 15 }),
     ])]);
+    if (app.told.length) left.push(["What I told them", stack(app.told.map((r, i) => T(r.label ? `${r.label}: ${r.value}` : r.value, { size: 15, max: 3, gap: i ? 6 : 0 })))]);
     const tl = splitTools(app.tools);
     if (tl.length) left.push(["Tools", (d, x0, y0, w) => flow(d, tl, x0, y0, w)]);
     if (app.responsibilities) left.push(["Responsibilities", stack([T(app.responsibilities, { max: 16 })])]);
@@ -1947,6 +2109,348 @@ function drawBrief(canvas, cid, appId) {
   canvas.getContext("2d").drawImage(tmp, 0, 0, W * SCALE, H * SCALE, 0, 0, W * SCALE, H * SCALE);
 }
 
+// ---------- me: about me and portfolio projects ------------------------------------------------
+
+// S.meEdit says which part of the Me page is a form: "profile", "project:<id>" or "project:new".
+function renderMe() {
+  const p = S.data.profile[0], edit = S.meEdit;
+  const projects = S.data.projects.slice().sort((a, b) => a.name.localeCompare(b.name));
+  $("#me").innerHTML = `
+    <div class="me-head">
+      <h2>${esc(p.name || "About me")}</h2>
+      <button class="btn primary" data-me="message" title="A prompt for a LinkedIn/Reddit comment or a DM pitch">Write a message</button>
+    </div>
+    <section class="sec">
+      <div class="sech"><h3>About me</h3>${edit === "profile" ? "" : `<button class="btn small" data-me="edit" data-edit="profile">Edit</button>`}</div>
+      ${edit === "profile" ? profileForm(p) : profileView(p)}
+    </section>
+    <section class="sec">
+      <div class="sech"><h3>Projects (${projects.length})</h3><span class="sech-a">
+        <button class="btn small" data-me="import" title="Columns like Name, Description, Tools, Repo, Demo, Role, Dates, Results">Import CSV</button>
+        <button class="btn small" data-me="edit" data-edit="project:new">+ Add project</button></span></div>
+      ${edit === "project:new" ? projectForm(null) : ""}
+      ${projects.length ? `<div class="projects">${projects.map(pr => edit === `project:${pr.id}` ? projectForm(pr) : projectCard(pr)).join("")}</div>`
+        : edit === "project:new" ? "" : `<p class="empty-note">Add the projects you'd point people to; they go into every message and email prompt. Or import a CSV with columns like Name, Description, Tools, Repo, Demo, Role, Dates, Results.</p>`}
+    </section>`;
+  $$("#me textarea").forEach(autosize);
+}
+
+// A line from the Links box ("GitHub: github.com/me", "me@mail.com") as a link.
+const lineLink = line => {
+  const m = line.match(/[^\s@:]+@[^\s@]+\.[^\s@]+|(?:https?:\/\/)?[\w-]+(?:\.[\w-]+)+\S*/);
+  return m ? personLink(m[0]) : esc(line);
+};
+const lines = text => (text || "").split("\n").map(l => l.trim()).filter(Boolean);
+
+function profileView(p) {
+  if (!(p.name || p.headline || p.location || p.about || p.skills || p.links)) {
+    return `<p class="empty-note">Your name, a one-line headline, a short background, skills and links. It goes at the top of every prompt so the LLM writes as you.</p>`;
+  }
+  return (p.headline ? `<p class="headline">${esc(p.headline)}</p>` : "") +
+    metaline([p.location && esc(p.location), ...lines(p.links).map(lineLink)].filter(Boolean)) +
+    ro("Background", p.about) +
+    (p.skills ? `<div class="ro"><span>Skills</span><div class="tools">${toolChips(p.skills)}</div></div>` : "");
+}
+
+function profileForm(p) {
+  return `<form class="eform" data-edit="profile" autocomplete="off">
+    <div class="grid3">
+      ${fld("Name", `<input type="text" name="name" value="${esc(p.name)}">`)}
+      ${fld("Headline", `<input type="text" name="headline" value="${esc(p.headline)}" placeholder="e.g. Backend engineer, 5 years of Python">`)}
+      ${fld("Location", `<input type="text" name="location" value="${esc(p.location)}" placeholder="e.g. Lahore, open to remote">`)}
+    </div>
+    ${fld("Background", `<textarea name="about" rows="4" placeholder="A few lines about your experience, what you're good at and what you're looking for">${esc(p.about)}</textarea>`)}
+    ${fld("Skills", `<input type="text" name="skills" value="${esc(p.skills)}" placeholder="Python, Django, AWS, Postgres">`)}
+    ${fld("Links <span class=\"muted\">(one per line)</span>", `<textarea name="links" rows="3" placeholder="linkedin.com/in/me&#10;github.com/me&#10;me@mail.com">${esc(p.links)}</textarea>`)}
+    ${formButtons()}
+  </form>`;
+}
+
+function projectCard(pr) {
+  const links = [pr.repo_url && `<a class="ext" href="${esc(href(pr.repo_url))}" target="_blank" rel="noopener">Code ↗</a>`,
+    pr.demo_url && `<a class="ext" href="${esc(href(pr.demo_url))}" target="_blank" rel="noopener">Live ↗</a>`].filter(Boolean);
+  return `<div class="pcard">
+    <div class="pcard-h"><b>${esc(pr.name)}</b>
+      <span class="pcard-a"><button class="btn small ghost" data-me="edit" data-edit="project:${pr.id}">Edit</button><button class="btn small ghost danger" data-me="del-project" data-id="${pr.id}">Delete</button></span></div>
+    ${[pr.dates, pr.role].some(Boolean) ? `<div class="muted">${esc([pr.dates, pr.role].filter(Boolean).join(" · "))}</div>` : ""}
+    ${pr.description ? `<p>${esc(pr.description)}</p>` : ""}
+    ${pr.tools ? `<div class="tools">${toolChips(pr.tools)}</div>` : ""}
+    ${pr.results ? `<p><b>Results:</b> ${esc(pr.results)}</p>` : ""}
+    ${links.length ? `<div class="plinks">${links.join("")}</div>` : ""}
+  </div>`;
+}
+
+function projectForm(pr) {
+  const v = pr || { name: "", description: "", tools: "", repo_url: "", demo_url: "", role: "", dates: "", results: "" };
+  return `<form class="eform" data-edit="${pr ? `project:${pr.id}` : "project:new"}" autocomplete="off">
+    <div class="grid3">
+      ${fld("Name *", `<input type="text" name="name" value="${esc(v.name)}" required>`)}
+      ${fld("Dates", `<input type="text" name="dates" value="${esc(v.dates)}" placeholder="e.g. Jan–Mar 2026">`)}
+      ${fld("My role", `<input type="text" name="role" value="${esc(v.role)}" placeholder="e.g. Solo, or backend in a team of 4">`)}
+    </div>
+    ${fld("Description", `<textarea name="description" rows="2" placeholder="What it is and what it does">${esc(v.description)}</textarea>`)}
+    ${fld("Tools", `<input type="text" name="tools" value="${esc(v.tools)}" placeholder="Python, React, Postgres">`)}
+    <div class="grid2">
+      ${fld("Repo", `<input type="text" name="repo_url" value="${esc(v.repo_url)}" placeholder="github.com/me/project">`)}
+      ${fld("Live demo", `<input type="text" name="demo_url" value="${esc(v.demo_url)}" placeholder="https://…">`)}
+    </div>
+    ${fld("Results / highlights", `<textarea name="results" rows="2" placeholder="e.g. 1.2k users, cut load time 60%">${esc(v.results)}</textarea>`)}
+    ${formButtons()}
+  </form>`;
+}
+
+function openMeEdit(key) {
+  S.meEdit = key;
+  renderMe();
+  const f = $("#me .eform");
+  f?.scrollIntoView({ block: "nearest" });
+  $("input, textarea", f)?.focus();
+}
+
+async function saveMe(form) {
+  const [kind, id] = form.dataset.edit.split(":"), data = formData(form);
+  if (kind === "project" && !data.name.trim()) { form.elements.name.focus(); return toast("A project needs a name", "error"); }
+  try {
+    if (kind === "profile") await api("PATCH", "/api/profile/1", data);
+    else if (id === "new") await api("POST", "/api/projects", data);
+    else await api("PATCH", `/api/projects/${id}`, data);
+    S.meEdit = null;
+    await reload(); renderMain();
+    toast("Saved");
+  } catch (err) { toast(err.message, "error"); }
+}
+
+async function meAction(act, el) {
+  try {
+    switch (act) {
+      case "edit": return openMeEdit(el.dataset.edit);
+      case "message": return openPitchPrompt();
+      case "import": return $("#file-projects").click();
+      case "del-project": {
+        const pr = findRow("projects", +el.dataset.id);
+        if (!confirm(`Delete the project ${pr.name}?`)) return;
+        await api("DELETE", `/api/projects/${pr.id}`);
+        await reload(); renderMain();
+        return toast(`Deleted ${pr.name}`);
+      }
+    }
+  } catch (err) { toast(err.message, "error"); }
+}
+
+async function importProjects(file) {
+  const text = await file.text();
+  const run = dry => fetch(`/api/import-projects?dry=${dry ? 1 : 0}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "text/csv" }, body: text })
+    .then(async res => { const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || res.statusText); return data; });
+  let r;
+  try { r = await run(true); } catch (err) { return toast(err.message, "error"); }
+  const m = openModal(`
+    <h2>Import ${esc(file.name)}</h2>
+    <p class="muted" style="margin-top:0">Nothing is saved until you press Import. A project with the same name as one you have is updated, not duplicated.</p>
+    <div class="import-stats">
+      <b>${r.rows}</b><span>rows read</span>
+      <b>${r.created}</b><span>new projects</span>
+      <b>${r.updated}</b><span>existing projects updated</span>
+      ${r.rows_skipped ? `<b>${r.rows_skipped}</b><span>rows without a name (skipped)</span>` : ""}
+    </div>
+    ${r.unknown_columns.length ? `<p style="font-size:13px">Columns added to the description: ${r.unknown_columns.map(esc).join(", ")}</p>` : ""}
+    <div class="actions"><button class="btn" data-close>Cancel</button><button class="btn primary" id="pimp-go">Import</button></div>`);
+  $("[data-close]", m).onclick = closeModal;
+  $("#pimp-go", m).onclick = async () => {
+    try {
+      const done = await run(false);
+      closeModal();
+      await reload(); renderMain();
+      toast(`Imported ${plural(done.created, "new project")}${done.updated ? `, updated ${done.updated}` : ""}`);
+    } catch (err) { toast(err.message, "error"); }
+  };
+}
+
+// ---------- LLM prompts ------------------------------------------------------------------------
+// Nothing is sent anywhere: these build a prompt you copy into ChatGPT, Claude, Gemini or similar.
+
+const oneLine = t => (t || "").replace(/\s*\n+\s*/g, " ").trim();
+const section = (title, body) => body ? `## ${title}\n${body}` : "";
+
+function aboutMeBlock() {
+  const p = S.data.profile[0];
+  const rows = [
+    p.name && `Name: ${p.name}`, p.headline && `Headline: ${p.headline}`, p.location && `Location: ${p.location}`,
+    p.skills && `Skills: ${p.skills}`, p.links && `Links: ${lines(p.links).join(", ")}`, p.about && `Background: ${p.about.trim()}`,
+  ].filter(Boolean);
+  return section("About me", rows.join("\n") || "(Not filled in: write [my name] where my name goes and keep claims about me general.)");
+}
+
+function projectsBlock() {
+  return section("My projects", S.data.projects.map(pr => [
+    `- ${pr.name}${[pr.dates, pr.role].some(Boolean) ? ` (${[pr.dates, pr.role].filter(Boolean).join("; ")})` : ""}${pr.description ? `: ${oneLine(pr.description)}` : ""}`,
+    pr.tools && `  Tools: ${pr.tools}`, pr.results && `  Results: ${oneLine(pr.results)}`,
+    (pr.repo_url || pr.demo_url) && `  Links: ${[pr.repo_url, pr.demo_url].filter(Boolean).join(", ")}`,
+  ].filter(Boolean).join("\n")).join("\n"));
+}
+
+function jobBlock(a) {
+  const c = S.co.get(a.company_id), people = S.peopleBy.get(c.id) || [];
+  const history = timelineItems(c.id).filter(e => !e.application_id || e.application_id === a.id)
+    .sort((x, y) => (x.when + (x.event_time || "")).localeCompare(y.when + (y.event_time || ""))).slice(-20)
+    .map(e => `- ${e.when}${e.event_time ? " " + fmtTime(e.event_time) : ""} · ${kindLabel(e.kind)}${e.when > S.data.today ? " (upcoming)" : ""}: ${oneLine(e.body) || "—"}`);
+  return [
+    section(`The company: ${c.name}`, [c.website && `Website: ${c.website}`, c.about && `What they do: ${oneLine(c.about)}`,
+      c.refs && `Referral / who I know there: ${oneLine(c.refs)}`, c.notes && `My notes on them: ${oneLine(c.notes)}`].filter(Boolean).join("\n") || "(no details saved)"),
+    section(`The role: ${a.position || "untitled"}`, [a.status && `Status: ${a.status}`,
+      a.date_applied && `Applied: ${fmtDate(a.date_applied, { year: true })} (${ago(daysSince(a.date_applied))})`,
+      a.job_url && `Job post: ${a.job_url}`, a.tools && `Tools they want: ${a.tools}`,
+      a.responsibilities && `Responsibilities: ${oneLine(a.responsibilities)}`, a.offer && `Offer: ${a.offer}`,
+      a.joining_date && `Joining date: ${fmtDate(a.joining_date, { year: true })}`, a.comments && `My comments: ${oneLine(a.comments)}`].filter(Boolean).join("\n")),
+    section("What I've already told them (stay consistent with this)", a.told.map(r => `- ${r.label ? r.label + ": " : ""}${r.value}`).join("\n")),
+    section("People there", people.map(p => `- ${p.name}${p.role ? ` (${p.role})` : ""}${p.link ? `, ${p.link}` : ""}${p.notes ? `: ${oneLine(p.notes)}` : ""}`).join("\n")),
+    section("History so far (oldest first)", history.join("\n")),
+  ].filter(Boolean).join("\n\n");
+}
+
+const EMAIL_TYPES = {
+  followup: { label: "Follow-up after applying", extra: "Anything to mention (optional)", ph: "e.g. I just shipped a project that uses their stack" },
+  thanks: { label: "Thank-you after an interview", extra: "What stood out in the interview (optional)", ph: "e.g. we talked about their move to Kubernetes" },
+  reply: { label: "Reply to a message", extra: "Paste their message", ph: "Paste the email or LinkedIn message here", required: "Paste the message you're replying to" },
+  anything: { label: "Anything else", extra: "What do you want to write?", ph: "e.g. ask to move the interview to next week; negotiate the offer up 10%", required: "Say what you want to write" },
+};
+
+function emailTask(type, a, F) {
+  const c = S.co.get(a.company_id), role = a.position || "the role", extra = F.extra.value.trim();
+  const iv = type === "thanks" && F.interview?.value ? findRow("events", +F.interview.value) : null;
+  switch (type) {
+    case "followup":
+      return `Write a short follow-up email about my application for ${role} at ${c.name}${a.date_applied ? `, which I sent on ${fmtDate(a.date_applied, { year: true })} (${ago(daysSince(a.date_applied))})` : ""}. ` +
+        `Restate my interest, point to one or two specific things from my background or projects that fit this role, and ask politely about next steps. Friendly and confident, not pushy.` +
+        (extra ? `\nAlso work this in: ${extra}` : "");
+    case "thanks":
+      return `Write a thank-you email after my interview${iv ? ` on ${fmtDate(iv.event_date, { weekday: true, year: true })}${iv.body ? ` (${oneLine(iv.body)})` : ""}` : ""} for ${role} at ${c.name}. ` +
+        `Thank them for their time, mention something specific we discussed, and briefly restate why I'm a good fit.` +
+        (extra ? `\nWhat stood out in the interview: ${extra}` : "\nIf nothing specific from the interview is listed below, keep that part general instead of inventing details.");
+    case "reply":
+      return `Write my reply to this message from ${c.name} about the ${role} role:\n"""\n${extra || "[their message]"}\n"""\n` +
+        `Answer everything they asked. For salary, notice period, availability and similar, use what I've already told them; if it isn't covered, leave a [placeholder] for me to fill in.`;
+    default:
+      return `${extra || "[what I want to write]"}\n\nThis is about my application for ${role} at ${c.name}.`;
+  }
+}
+
+function buildEmailPrompt(a, F) {
+  const type = F.type.value;
+  return [
+    `You're helping me write a message about a job I applied for.\n\n## What I need\n${emailTask(type, a, F)}`,
+    jobBlock(a), aboutMeBlock(), projectsBlock(),
+    section("How to write it", [
+      "- Under 150 words. Plain, specific and human; no clichés like \"I hope this email finds you well\".",
+      "- Don't invent facts about me, the company or the interview. Where something is missing, leave a [placeholder].",
+      "- Stay consistent with what I've already told them.",
+      "- Address the right person from \"People there\" when it's clear who; otherwise keep the greeting general.",
+      type === "reply" ? "- It's a reply, so no subject line. Sign off with my name." : "- Start with a subject line, then the email. Sign off with my name.",
+      `- Today is ${fmtDate(S.data.today, { weekday: true, year: true })}.`,
+    ].join("\n")),
+  ].filter(Boolean).join("\n\n");
+}
+
+const PITCH_TYPES = {
+  comment: { label: "Comment on a post", source: "Paste the post (and the comment you're replying to, if any)" },
+  dm: { label: "DM / pitch", source: "Paste their profile, post, or what you know about them" },
+};
+const PLATFORMS = ["LinkedIn", "Reddit", "X / Twitter", "Email", "Other"];
+
+function pitchTask(F) {
+  const platform = F.platform.value, goal = F.goal.value.trim();
+  if (F.type.value === "comment") {
+    const style = platform === "Reddit"
+      ? "Match the subreddit's casual tone and be genuinely helpful. Write like a real person: no marketing speak, no hard sell and no links unless someone asked. Mentioning my experience is fine when it's relevant."
+      : platform === "LinkedIn"
+        ? "Add something of value: an insight, a short experience of mine, or a thoughtful question. Conversational and professional, 2–4 sentences. No hashtags, no \"Great post!\"."
+        : "Add something of value in a few sentences, in the tone of the platform.";
+    return `Write a comment on this ${platform} post. ${style} Bring up one of my projects only if it genuinely fits.` + (goal ? `\nWhat I'm hoping for: ${goal}` : "");
+  }
+  return `Write a short direct message (${platform}) to this person. Open with something specific from what they wrote or their profile, ` +
+    `mention the one or two projects of mine that are most relevant, and make one clear ask${goal ? `: ${goal}` : ""}. ` +
+    (platform === "Email" ? "Under 150 words, with a subject line." : "Under 100 words.") + " Warm and specific; no flattery or buzzwords.";
+}
+
+function buildPitchPrompt(F) {
+  return [
+    `You're helping me write a message.\n\n## What I need\n${pitchTask(F)}`,
+    section(F.type.value === "comment" ? "The post" : "About them", `"""\n${F.source.value.trim() || "[paste it here]"}\n"""`),
+    aboutMeBlock(), projectsBlock(),
+    section("How to write it", [
+      "- Don't invent facts about me; use only what's here.",
+      "- Sound like a person, not a template.",
+      "- Give me two versions: a shorter one and a slightly longer one.",
+    ].join("\n")),
+  ].filter(Boolean).join("\n\n");
+}
+
+// The modal both prompt kinds share: a few choices, the prompt as it'll be copied, and a Copy button.
+function promptModal(title, fieldsHtml, build, onChange) {
+  const p = S.data.profile[0];
+  const empty = !(p.name || p.about || p.headline);
+  const m = openModal(`
+    <div class="mhead"><h2>${esc(title)}</h2><button class="btn ghost" data-close>✕</button></div>
+    <form class="pform" autocomplete="off">${fieldsHtml}</form>
+    ${empty ? `<p class="cohint"><b>Your About me is empty.</b> <a href="#" data-go-me>Fill it in on the Me tab</a> so the message is written as you.</p>` : ""}
+    ${fld("Prompt to copy", `<textarea class="prompt-out" rows="12" readonly></textarea>`)}
+    <div class="actions"><span class="muted pcount"></span><span class="spacer"></span>
+      <button class="btn" data-close>Close</button><button class="btn primary" data-copy>Copy prompt</button></div>`, "wide");
+  const form = $(".pform", m), out = $(".prompt-out", m);
+  const update = () => {
+    onChange?.(form.elements);
+    out.value = build(form.elements);
+    $(".pcount", m).textContent = `${out.value.length.toLocaleString()} characters · paste into ChatGPT, Claude, Gemini…`;
+  };
+  form.addEventListener("input", update);
+  form.addEventListener("change", update);
+  $$("[data-close]", m).forEach(b => b.onclick = closeModal);
+  $("[data-copy]", m).onclick = async () => {
+    const need = $("[data-required]", form);
+    if (need && !need.value.trim()) { need.focus(); return toast(need.dataset.required, "error"); }
+    try { await navigator.clipboard.writeText(out.value); }
+    catch { out.select(); document.execCommand("copy"); }
+    toast("Prompt copied");
+  };
+  update();
+  $("select, textarea", form)?.focus();
+  return m;
+}
+
+function openAppPrompt(appId) {
+  const a = findRow("applications", appId), c = S.co.get(a.company_id);
+  const interviews = coEvents(c.id).filter(e => e.kind === "interview" && e.event_date && e.event_date <= S.data.today
+    && (!e.application_id || e.application_id === a.id)).sort(byWhen).reverse();
+  const type = interviews.length && daysSince(interviews[0].event_date) <= 3 ? "thanks" : "followup";
+  promptModal(`Write email: ${c.name}`, `
+    <div class="grid2">
+      ${fld("What kind", `<select name="type">${Object.entries(EMAIL_TYPES).map(([k, t]) => `<option value="${k}" ${k === type ? "selected" : ""}>${t.label}</option>`).join("")}</select>`)}
+      <div class="iv-field">${interviews.length ? fld("Which interview", `<select name="interview">${interviews.map(e => `<option value="${e.id}">${esc(fmtDate(e.event_date, { weekday: true, year: true }))}${e.body ? " · " + esc(clipText(e.body, 50)) : ""}</option>`).join("")}</select>`) : ""}</div>
+    </div>
+    <label class="fld"><span class="extra-label"></span><textarea name="extra" rows="4"></textarea></label>`,
+  F => buildEmailPrompt(a, F),
+  F => {
+    const t = EMAIL_TYPES[F.type.value], ta = F.extra;
+    ta.closest(".fld").querySelector(".extra-label").textContent = t.extra;
+    ta.placeholder = t.ph;
+    if (t.required) ta.dataset.required = t.required; else delete ta.dataset.required;
+    const iv = ta.form.querySelector(".iv-field");
+    iv.hidden = F.type.value !== "thanks";
+  });
+}
+const clipText = (t, n) => (t = oneLine(t)).length > n ? t.slice(0, n - 1) + "…" : t;
+
+function openPitchPrompt() {
+  promptModal("Write a message", `
+    <div class="grid3">
+      ${fld("What kind", `<select name="type">${Object.entries(PITCH_TYPES).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join("")}</select>`)}
+      ${fld("Where", `<select name="platform">${PLATFORMS.map(p => `<option>${p}</option>`).join("")}</select>`)}
+      ${fld("What you want <span class=\"muted\">(optional)</span>", `<input type="text" name="goal" placeholder="e.g. ask for a referral, offer freelance help">`)}
+    </div>
+    <label class="fld"><span class="source-label"></span><textarea name="source" rows="6" data-required="Paste the post or what you know about them"></textarea></label>`,
+  buildPitchPrompt,
+  F => { F.source.closest(".fld").querySelector(".source-label").textContent = PITCH_TYPES[F.type.value].source; });
+}
+
 // ---------- events -----------------------------------------------------------------------------
 
 function wire() {
@@ -1994,6 +2498,12 @@ function wire() {
     }
     const brief = t.closest("[data-brief]");
     if (brief) { e.stopPropagation(); return openBrief(+brief.dataset.brief, +brief.dataset.briefApp || null); }
+    if (t.closest("[data-ghost-all]")) return markGhosted();
+    const goMe = t.closest("[data-go-me]");
+    if (goMe) { e.preventDefault(); closeModal(); closeDrawer(); setView("me"); return openMeEdit("profile"); }
+    const me = t.closest("#me [data-me]");
+    if (me) return meAction(me.dataset.me, me);
+    if (t.closest("#me [data-act=cancel-edit]")) { S.meEdit = null; return renderMe(); }
     const legend = t.closest("[data-legend-status]");
     if (legend) { S.status = legend.dataset.legendStatus; return setView("applications"); }
     const cal = t.closest("[data-cal]");
@@ -2056,6 +2566,18 @@ function wire() {
     tip.style.top = Math.max(8, e.clientY - 40) + "px";
   });
 
+  const mePage = $("#me");
+  mePage.addEventListener("submit", e => { if (e.target.matches(".eform")) { e.preventDefault(); saveMe(e.target); } });
+  mePage.addEventListener("keydown", e => {
+    const form = e.target.closest(".eform");
+    if (form && e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
+  });
+  $("#file-projects").addEventListener("change", e => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) importProjects(file);
+  });
+
   $("#file-import").addEventListener("change", e => {
     const file = e.target.files[0];
     e.target.value = "";
@@ -2069,6 +2591,7 @@ function wire() {
       if (modalEl) { closeModal(); e.preventDefault(); }
       else if (typing) t.blur();
       else if (S.open?.edit) cancelEdit();
+      else if (S.view === "me" && S.meEdit) { S.meEdit = null; renderMe(); }
       else if (S.open) closeDrawer();
       else if (S.q || S.filters.size || S.status) { S.q = ""; $("#search").value = ""; S.filters.clear(); S.status = null; renderMain(); }
       return;
@@ -2085,6 +2608,7 @@ function wire() {
       2: () => setView("applications"),
       3: () => setView("companies"),
       4: () => setView("calendar"),
+      5: () => setView("me"),
       ...(S.view === "calendar" ? { ArrowLeft: () => shiftMonth(-1), ArrowRight: () => shiftMonth(1) } : {}),
       "?": () => showShortcuts(),
     };
@@ -2092,7 +2616,7 @@ function wire() {
   });
 
   // Warn before closing the tab with an unsaved form open in the company panel.
-  window.addEventListener("beforeunload", e => { if (S.open?.edit) e.preventDefault(); });
+  window.addEventListener("beforeunload", e => { if (S.open?.edit || S.meEdit) e.preventDefault(); });
 }
 
 (async function start() {

@@ -41,6 +41,7 @@ _map("app", "offer", "offer", "salary", "compensation")
 _map("app", "joining_date", "joining date", "join date", "start date")
 _map("app", "responsibilities", "responsibilities", "duties")
 _map("app", "comments", "comments", "comment", "notes", "note")
+_map("app", "told", "what i told them", "told them", "what i told")
 _map("app", None, "days since applied", "weeks since applied", "days", "weeks")
 
 STATUS_WORDS = {
@@ -141,6 +142,15 @@ def parse_date(text: str, order: str = "mdy") -> str | None:
     return None
 
 
+def parse_told(text: str) -> list[dict]:
+    """"Resume: v3; Salary: will discuss" -> label/value rows (the export writes them this way)."""
+    rows = []
+    for part in re.split(r"[;\n]", text):
+        label, sep, value = part.partition(":")
+        rows.append({"label": label.strip(), "value": value.strip()} if sep else {"label": "", "value": part.strip()})
+    return db.parse_pairs(rows)
+
+
 def normalize_status(text: str, statuses: list[str]) -> str:
     t = text.strip()
     if not t:
@@ -229,6 +239,8 @@ def _import_row(conn, row, columns, line_no, statuses, date_order, result: Impor
             value = normalize_status(value, statuses)
             if value not in statuses:
                 result.warnings.append(f"Row {line_no}: kept unknown status '{value}' as-is")
+        elif fld == "told":
+            value = parse_told(value)
         (company if record == "company" else app)[fld] = value
 
     name = company.get("name", "")
@@ -268,3 +280,82 @@ def _import_row(conn, row, columns, line_no, statuses, date_order, result: Impor
         return
     db.insert(conn, "applications", {**app, "company_id": company_id})
     result.applications_created += 1
+
+
+# ---- portfolio projects ------------------------------------------------------------------------
+
+PROJECT_HEADERS: dict[str, str | None] = {}
+for _fld, _names in {
+    "name": ("name", "project", "project name", "title"),
+    "description": ("description", "summary", "about", "details", "what it does", "overview"),
+    "tools": ("tools", "tech", "tech stack", "stack", "technologies", "technology", "skills", "built with"),
+    "repo_url": ("repo", "repository", "github", "gitlab", "source", "code", "repo url", "source code"),
+    "demo_url": ("demo", "live", "live demo", "url", "link", "website", "site", "demo url", "live url"),
+    "role": ("role", "my role", "contribution", "responsibilities", "team"),
+    "dates": ("dates", "date", "when", "period", "timeline", "year", "duration"),
+    "results": ("results", "result", "highlights", "impact", "outcome", "outcomes", "metrics", "achievements"),
+}.items():
+    for _name in _names:
+        PROJECT_HEADERS[_name] = _fld
+
+
+@dataclass
+class ProjectImportResult:
+    rows: int = 0
+    created: int = 0
+    updated: int = 0
+    rows_skipped: int = 0
+    unknown_columns: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict:
+        return self.__dict__.copy()
+
+
+def import_projects(conn: sqlite3.Connection, text: str, *, dry_run: bool = False) -> ProjectImportResult:
+    """Import portfolio projects from CSV. A project with the same name as one you have is updated
+    with the file's non-empty values, so importing the same file twice changes nothing.
+    Unrecognised columns are added to the description as "Header: value"."""
+    result = ProjectImportResult()
+    rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
+    head = next((i for i, r in enumerate(rows[:15]) if any(PROJECT_HEADERS.get(norm_header(c)) == "name" for c in r)), None)
+    if head is None:
+        raise db.ValidationError("Couldn't find a header row with a project name column (e.g. 'Name' or 'Project')")
+    columns = [(h.strip(), PROJECT_HEADERS.get(norm_header(h))) for h in rows[head]]
+    result.unknown_columns = [h for h, f in columns if f is None and h]
+    try:
+        for row in rows[head + 1:]:
+            if not any(c.strip() for c in row):
+                continue
+            result.rows += 1
+            project: dict = {}
+            extras: list[str] = []
+            for i, (header, fld) in enumerate(columns):
+                value = row[i].strip() if i < len(row) else ""
+                if not value:
+                    continue
+                if fld is None:
+                    extras.append(f"{header}: {value}")
+                elif fld in project:
+                    project[fld] += "\n" + value
+                else:
+                    project[fld] = value
+            if not project.get("name"):
+                result.rows_skipped += 1
+                continue
+            if extras:
+                project["description"] = "\n".join(filter(None, [project.get("description", ""), *extras]))
+            existing = conn.execute("SELECT id FROM projects WHERE name = ? COLLATE NOCASE", (project["name"],)).fetchone()
+            if existing:
+                db.update(conn, "projects", existing["id"], project)
+                result.updated += 1
+            else:
+                db.insert(conn, "projects", project)
+                result.created += 1
+    except BaseException:
+        conn.rollback()
+        raise
+    if dry_run:
+        conn.rollback()
+    else:
+        conn.commit()
+    return result

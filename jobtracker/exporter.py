@@ -16,12 +16,20 @@ REMOTE_LABELS = {"": "", "remote": "Remote", "hybrid": "Hybrid", "onsite": "On-s
 APPLICATION_COLUMNS = [
     "Names", "Website", "Is Big Tech?", "Remote?", "Urgent", "Job post", "References", "Position",
     "Tools", "Date Applied", "Days Since Applied", "Weeks Since Applied", "Status", "Offer",
-    "Joining Date", "Responsibilities", "Comments",
+    "Joining Date", "Responsibilities", "Comments", "What I told them",
 ]
 COMPANY_COLUMNS = [
     "Name", "Website", "Is Big Tech?", "Remote?", "Urgent", "What they do", "References", "Notes",
     "People", "Applications", "Latest position", "Latest status", "Last applied",
 ]
+
+
+PROJECT_COLUMNS = ["Name", "Description", "Tools", "Repo", "Demo", "Role", "Dates", "Results"]
+
+
+def told_text(rows: list[dict]) -> str:
+    """Label/value rows as one cell: "Resume: v3; Salary: will discuss". The importer reads this back."""
+    return "; ".join(f"{r['label']}: {r['value']}" if r["label"] else r["value"] for r in rows)
 
 
 def _yes(value: bool) -> str:
@@ -74,7 +82,7 @@ def applications_csv(conn: sqlite3.Connection, today: date | None = None) -> str
                 REMOTE_LABELS.get(c["remote"], c["remote"]), _yes(c["urgent"])]
         mine = sorted(apps.get(c["id"], []), key=lambda a: (a["date_applied"], a["id"]))
         if not mine:
-            rows.append([*base, "", c["refs"], "", "", "", "", "", "", "", "", "", c["notes"]])
+            rows.append([*base, "", c["refs"], "", "", "", "", "", "", "", "", "", c["notes"], ""])
         for a in mine:
             days = weeks = ""
             if a["date_applied"]:
@@ -82,9 +90,15 @@ def applications_csv(conn: sqlite3.Connection, today: date | None = None) -> str
                 days, weeks = n, n // 7
             rows.append([
                 *base, a["job_url"], c["refs"], a["position"], a["tools"], a["date_applied"], days, weeks,
-                a["status"], a["offer"], a["joining_date"], a["responsibilities"], a["comments"],
+                a["status"], a["offer"], a["joining_date"], a["responsibilities"], a["comments"], told_text(a["told"]),
             ])
     return _csv(APPLICATION_COLUMNS, rows)
+
+
+def projects_csv(conn: sqlite3.Connection) -> str:
+    rows = [[p["name"], p["description"], p["tools"], p["repo_url"], p["demo_url"], p["role"], p["dates"], p["results"]]
+            for p in db.all_rows(conn, "projects")]
+    return _csv(PROJECT_COLUMNS, rows)
 
 
 def backup_json(conn: sqlite3.Connection) -> str:
@@ -94,6 +108,7 @@ def backup_json(conn: sqlite3.Connection) -> str:
 EXPORTS = {
     "companies.csv": ("text/csv", companies_csv),
     "applications.csv": ("text/csv", applications_csv),
+    "projects.csv": ("text/csv", projects_csv),
     "backup.json": ("application/json", backup_json),
 }
 

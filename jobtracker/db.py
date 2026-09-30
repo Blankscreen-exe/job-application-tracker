@@ -1,10 +1,12 @@
-"""SQLite storage: companies, their applications, the people you talk to and a log of events.
+"""SQLite storage: companies, their applications, the people you talk to and a log of events,
+plus a little about you (your profile and portfolio projects) for writing messages.
 
 Functions here never commit; callers wrap their work in `with conn:` so a request is all-or-nothing.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from datetime import date, datetime
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS applications (
     joining_date     TEXT NOT NULL DEFAULT '',
     responsibilities TEXT NOT NULL DEFAULT '',
     comments         TEXT NOT NULL DEFAULT '',
+    told             TEXT NOT NULL DEFAULT '[]',
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL
 );
@@ -48,6 +51,7 @@ CREATE TABLE IF NOT EXISTS events (
     body           TEXT NOT NULL DEFAULT '',
     event_date     TEXT NOT NULL DEFAULT '',
     event_time     TEXT NOT NULL DEFAULT '',
+    remind         INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT NOT NULL,
     updated_at     TEXT NOT NULL
 );
@@ -63,8 +67,37 @@ CREATE TABLE IF NOT EXISTS contacts (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS contacts_company ON contacts(company_id);
-PRAGMA user_version = 1;
+CREATE TABLE IF NOT EXISTS profile (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    name       TEXT NOT NULL DEFAULT '',
+    headline   TEXT NOT NULL DEFAULT '',
+    location   TEXT NOT NULL DEFAULT '',
+    about      TEXT NOT NULL DEFAULT '',
+    skills     TEXT NOT NULL DEFAULT '',
+    links      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS projects (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    tools       TEXT NOT NULL DEFAULT '',
+    repo_url    TEXT NOT NULL DEFAULT '',
+    demo_url    TEXT NOT NULL DEFAULT '',
+    role        TEXT NOT NULL DEFAULT '',
+    dates       TEXT NOT NULL DEFAULT '',
+    results     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
 """
+SCHEMA_VERSION = 2
+# Columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them to an old database.
+ADDED_COLUMNS = {
+    "applications": {"told": "TEXT NOT NULL DEFAULT '[]'"},
+    "events": {"remind": "INTEGER NOT NULL DEFAULT 0"},
+}
 
 # Editable fields per table and how each is checked. Anything not listed (id, timestamps) is ignored.
 FIELDS: dict[str, dict[str, str]] = {
@@ -75,17 +108,30 @@ FIELDS: dict[str, dict[str, str]] = {
     "applications": {
         "company_id": "ref", "position": "text", "job_url": "text", "tools": "tools",
         "date_applied": "date", "status": "text", "offer": "text", "joining_date": "date",
-        "responsibilities": "text", "comments": "text",
+        "responsibilities": "text", "comments": "text", "told": "pairs",
     },
     "events": {
         "company_id": "ref", "application_id": "optref", "kind": "kind", "body": "text",
-        "event_date": "date", "event_time": "time",
+        "event_date": "date", "event_time": "time", "remind": "bool",
     },
     "contacts": {
         "company_id": "ref", "name": "person", "role": "text", "link": "text", "notes": "text",
     },
+    "profile": {
+        "name": "text", "headline": "text", "location": "text", "about": "text", "skills": "tools", "links": "text",
+    },
+    "projects": {
+        "name": "project", "description": "text", "tools": "tools", "repo_url": "text", "demo_url": "text",
+        "role": "text", "dates": "text", "results": "text",
+    },
 }
 TABLES = tuple(FIELDS)
+# Tables whose rows belong to a company.
+COMPANY_TABLES = ("applications", "events", "contacts")
+# Kinds of text that can't be left blank, and what to say when they are.
+REQUIRED = {"name": "A company needs a name", "person": "A person needs a name", "project": "A project needs a name"}
+# Event kinds that get a reminder unless you say otherwise.
+REMIND_BY_DEFAULT = ("interview",)
 REMOTE_VALUES = ("", "remote", "hybrid", "onsite")
 EVENT_KINDS = ("note", "interview", "onboarding", "call", "email", "status", "other")
 TRUE_WORDS = {"1", "true", "yes", "y", "x", "on"}
@@ -113,7 +159,20 @@ def connect(path: Path | str, *, init: bool = False) -> sqlite3.Connection:
     if init:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        migrate(conn)
     return conn
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Bring an older database up to date. Safe to run every time."""
+    with conn:
+        for table, columns in ADDED_COLUMNS.items():
+            have = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            for column, decl in columns.items():
+                if column not in have:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        conn.execute("INSERT OR IGNORE INTO profile (id, created_at, updated_at) VALUES (1, ?, ?)", (now(), now()))
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
 def _coerce(kind: str, key: str, value):
@@ -128,14 +187,12 @@ def _coerce(kind: str, key: str, value):
         if isinstance(value, str):
             return int(value.strip().lower() in TRUE_WORDS)
         return int(bool(value))
+    if kind == "pairs":
+        return json.dumps(parse_pairs(value), ensure_ascii=False)
     text = "" if value is None else str(value).strip()
-    if kind == "name":
+    if kind in REQUIRED:
         if not text:
-            raise ValidationError("A company needs a name")
-        return text
-    if kind == "person":
-        if not text:
-            raise ValidationError("A person needs a name")
+            raise ValidationError(REQUIRED[kind])
         return text
     if kind == "remote":
         text = text.lower()
@@ -177,6 +234,32 @@ def join_tools(text: str) -> str:
     return ", ".join(out)
 
 
+def parse_pairs(value) -> list[dict]:
+    """Label/value rows ("Salary": "will discuss in interview"), from a list or its JSON text.
+
+    Rows with neither a label nor a value are dropped.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value or "[]")
+        except json.JSONDecodeError:
+            raise ValidationError("told must be a list of label/value rows") from None
+    if not isinstance(value, list):
+        raise ValidationError("told must be a list of label/value rows")
+    out = []
+    for item in value:
+        if isinstance(item, dict):
+            label, text = item.get("label"), item.get("value")
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            label, text = item
+        else:
+            raise ValidationError("told must be a list of label/value rows")
+        label, text = str(label or "").strip(), str(text or "").strip()
+        if label or text:
+            out.append({"label": label, "value": text})
+    return out
+
+
 def clean(table: str, data: dict) -> dict:
     spec = FIELDS[table]
     return {key: _coerce(spec[key], key, value) for key, value in data.items() if key in spec}
@@ -189,6 +272,8 @@ def _row(table: str, row: sqlite3.Row | None) -> dict | None:
     for key, kind in FIELDS[table].items():
         if kind == "bool":
             out[key] = bool(out[key])
+        elif kind == "pairs":
+            out[key] = parse_pairs(out[key])
     return out
 
 
@@ -216,15 +301,17 @@ def get(conn: sqlite3.Connection, table: str, row_id: int) -> dict | None:
 
 
 def insert(conn: sqlite3.Connection, table: str, data: dict) -> dict:
+    if table == "profile":
+        raise ValidationError("There is only one profile; update it instead")
     values = clean(table, data)
-    if table == "companies" and "name" not in values:
-        raise ValidationError("A company needs a name")
-    if table == "contacts" and "name" not in values:
-        raise ValidationError("A person needs a name")
-    if table != "companies" and "company_id" not in values:
+    for key, kind in FIELDS[table].items():
+        if kind in REQUIRED and key not in values:
+            raise ValidationError(REQUIRED[kind])
+    if table in COMPANY_TABLES and "company_id" not in values:
         raise ValidationError("company_id is required")
     if table == "events":
         _check_event_link(conn, values)
+        values.setdefault("remind", int(values.get("kind", "note") in REMIND_BY_DEFAULT))
     values["created_at"] = values["updated_at"] = now()
     cols = ", ".join(values)
     marks = ", ".join("?" for _ in values)
@@ -262,6 +349,8 @@ def update(conn: sqlite3.Connection, table: str, row_id: int, data: dict) -> dic
 
 
 def delete(conn: sqlite3.Connection, table: str, row_id: int) -> None:
+    if table == "profile":
+        raise ValidationError("The profile can't be deleted")
     if conn.execute(f"DELETE FROM {table} WHERE id = ?", (row_id,)).rowcount == 0:
         raise NotFound(f"{table} {row_id}")
 
