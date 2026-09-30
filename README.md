@@ -12,6 +12,11 @@ It runs in your browser, keeps everything in one file on your computer, and need
 - **People.** Recruiters, interviewers and referrers, with what to remember about each.
 - **Interview brief.** One click (or `b`) makes a PNG summary of the company: what they do, the role,
   tools, the people you'll meet, your notes and recent history. Download it or copy it to the clipboard.
+- **Dashboard.** Headline numbers, reminders for everything scheduled in the next 7 days (interviews
+  highlighted), applications per week, the status breakdown, how often you hear back by month, and
+  the tools that come up most.
+- **Calendar.** A month view of interviews, onboarding, calls and other dated entries, plus joining dates.
+  Click a day to add an event (company, which application, what, date and time), or an event to edit it.
 - **Follow-ups.** Applications with no activity for 14 days (configurable) are flagged.
 - **Filters and search.** Urgent, remote, big tech, active, needs a follow-up, not applied yet, by status,
   plus search across everything.
@@ -89,13 +94,15 @@ Edit `data/config.json` (created on first run):
   "stale_statuses": ["Applied", "Screening", "Interview"],
   "stale_days": 14,
   "upcoming_days": 14,
+  "reminder_days": 7,
   "backups_to_keep": 14
 }
 ```
 
 ## Keyboard
 
-`n` new (an application, or a company on the Companies tab) · `/` search · `j`/`k` move · `Enter` open · `b` brief · `1`/`2` switch views · `Esc` close ·
+`n` new (an application, a company on the Companies tab, an event on the Calendar) · `/` search · `j`/`k` move · `Enter` open · `b` brief ·
+`1`–`4` Applications / Companies / Calendar / Dashboard · `←`/`→` change month on the Calendar · `Esc` close ·
 `Ctrl+Enter` save a form or add a log entry · `?` all shortcuts
 
 ## Privacy

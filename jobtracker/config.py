@@ -21,6 +21,8 @@ DEFAULTS: dict = {
     "stale_days": 14,
     # How far ahead the "Coming up" list looks.
     "upcoming_days": 14,
+    # How far ahead the dashboard's reminders look.
+    "reminder_days": 7,
     # Daily database backups to keep.
     "backups_to_keep": 14,
 }

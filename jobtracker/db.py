@@ -87,7 +87,7 @@ FIELDS: dict[str, dict[str, str]] = {
 }
 TABLES = tuple(FIELDS)
 REMOTE_VALUES = ("", "remote", "hybrid", "onsite")
-EVENT_KINDS = ("note", "interview", "call", "email", "status", "other")
+EVENT_KINDS = ("note", "interview", "onboarding", "call", "email", "status", "other")
 TRUE_WORDS = {"1", "true", "yes", "y", "x", "on"}
 
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")

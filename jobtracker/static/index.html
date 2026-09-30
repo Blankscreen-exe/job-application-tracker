@@ -13,7 +13,10 @@
   --s-applied: #000000; --s-screening: #000000; --s-interview: #e30613; --s-offer: #e30613;
   --s-rejected: #9a9a9a; --s-ghosted: #b8b8b8; --s-withdrawn: #b8b8b8; --s-other: #666666;
   --k-note: #9a9a9a; --k-interview: #e30613; --k-call: #000000; --k-email: #000000;
-  --k-status: #666666; --k-other: #9a9a9a; --k-applied: #000000;
+  --k-status: #666666; --k-other: #9a9a9a; --k-applied: #000000; --k-onboarding: #000000; --k-joining: #000000;
+  /* chart series: one fixed hue per status, in config order (validated for colour-blind separation) */
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #4a3aa7; --series-8: #e34948; --series-none: #c8c8c8;
   --shadow: 0 18px 50px rgba(0, 0, 0, .18);
   --font: "Helvetica Neue", Helvetica, Arial, "Nimbus Sans", "Liberation Sans", sans-serif;
   color-scheme: light;
@@ -25,7 +28,9 @@
     --s-applied: #f2f2f2; --s-screening: #f2f2f2; --s-interview: #ff2d2d; --s-offer: #ff2d2d;
     --s-rejected: #7a7a7a; --s-ghosted: #5c5c5c; --s-withdrawn: #5c5c5c; --s-other: #a0a0a0;
     --k-note: #7a7a7a; --k-interview: #ff2d2d; --k-call: #f2f2f2; --k-email: #f2f2f2;
-    --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2;
+    --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2; --k-onboarding: #f2f2f2; --k-joining: #f2f2f2;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767; --series-none: #4a4a4a;
     --shadow: 0 18px 50px rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
@@ -36,7 +41,9 @@
   --s-applied: #f2f2f2; --s-screening: #f2f2f2; --s-interview: #ff2d2d; --s-offer: #ff2d2d;
   --s-rejected: #7a7a7a; --s-ghosted: #5c5c5c; --s-withdrawn: #5c5c5c; --s-other: #a0a0a0;
   --k-note: #7a7a7a; --k-interview: #ff2d2d; --k-call: #f2f2f2; --k-email: #f2f2f2;
-  --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2;
+  --k-status: #a0a0a0; --k-other: #7a7a7a; --k-applied: #f2f2f2; --k-onboarding: #f2f2f2; --k-joining: #f2f2f2;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767; --series-none: #4a4a4a;
   --shadow: 0 18px 50px rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
@@ -263,9 +270,120 @@ select.st option { color: var(--ink); background: var(--bg); }
 .toast.error { background: var(--accent); color: #fff; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
 
+/* dashboard */
+.dash[hidden] { display: none; }
+.dash { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0 32px; }
+.panel { grid-column: span 6; border-top: 2px solid var(--ink); padding: 8px 0 28px; min-width: 0; }
+.panel.wide { grid-column: span 12; }
+.panel.third { grid-column: span 4; }
+.panel.two-thirds { grid-column: span 8; }
+.panel h2 { font-size: 12px; font-weight: 700; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.panel h2 .muted { font-weight: 400; }
+.kpis { grid-column: span 12; display: flex; flex-wrap: wrap; border-top: 6px solid var(--ink); margin-bottom: 20px; }
+.kpi { padding: 10px 28px 8px 0; min-width: 110px; }
+.kpi b { display: block; font-size: 52px; font-weight: 700; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi b small { font-size: 24px; letter-spacing: -.02em; }
+.kpi span { display: block; font-size: 12px; font-weight: 700; margin-top: 5px; }
+.kpi em { display: block; font-style: normal; font-size: 12px; color: var(--muted); }
+.kpi.hot b { color: var(--accent); }
+.remind { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--rule); cursor: pointer; }
+.remind:first-of-type { border-top: 0; }
+.remind:hover { background: var(--hover); }
+.remind .when b { display: block; font-size: 17px; letter-spacing: -.02em; }
+.remind .when span { font-size: 12px; color: var(--muted); }
+.remind.interview .when b { color: var(--accent); }
+.remind .btn { justify-self: start; }
+.remind .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remind .k { font-size: 12px; font-weight: 700; color: var(--c); }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 170px; border-bottom: 1px solid var(--ink); position: relative; padding-right: 22px; }
+.bars .col { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+.bars .col:hover .bar { opacity: .75; }
+.bars .bar { width: 100%; background: var(--ink); border-radius: 4px 4px 0 0; min-height: 0; }
+.bars .col.now .bar { background: var(--accent); }
+.bars .grid { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--rule); font-size: 11px; color: var(--muted); pointer-events: none; }
+.bars .grid span { position: absolute; right: 0; top: -15px; background: var(--bg); padding-left: 4px; }
+.bar-x { display: flex; gap: 4px; padding-right: 22px; font-size: 11px; color: var(--muted); margin-top: 5px; }
+.bar-x span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; }
+.trend { position: relative; height: 170px; border-bottom: 1px solid var(--ink); margin-right: 34px; }
+.trend svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.trend path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.trend .grid { position: absolute; left: 0; right: -34px; border-top: 1px dashed var(--rule); font-size: 11px; color: var(--muted); pointer-events: none; }
+.trend .grid span { position: absolute; right: 0; top: -8px; background: var(--bg); padding-left: 4px; }
+.trend .cols { position: absolute; inset: 0; display: flex; }
+.trend .cols div { flex: 1; position: relative; }
+.trend .cols div:hover { background: var(--hover); }
+.trend .dot { position: absolute; left: 50%; width: 10px; height: 10px; margin: 0 0 -5px -5px; background: var(--ink); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); }
+.trend-x { display: flex; font-size: 11px; color: var(--muted); margin: 5px 34px 0 0; }
+.trend-x span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; }
+.donut-wrap { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.donut { width: 170px; height: 170px; flex: none; }
+.donut circle.seg { fill: none; stroke-width: 26; cursor: default; }
+.donut circle.seg:hover { stroke-width: 32; }
+.donut text { fill: var(--ink); font-family: var(--font); }
+.legend { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; gap: 5px 10px; align-items: center; font-size: 14px; flex: 1; min-width: 180px; }
+.legend i { width: 12px; height: 12px; background: var(--c); border-radius: 2px; }
+.legend b, .legend .muted { text-align: right; font-variant-numeric: tabular-nums; }
+.legend button { all: unset; cursor: pointer; font-weight: 700; }
+.legend button:hover { color: var(--accent); }
+.hbars { display: grid; grid-template-columns: minmax(70px, max-content) minmax(0, 1fr); gap: 7px 12px; align-items: center; font-size: 14px; }
+.hbars .lbl { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbars .track { display: flex; align-items: center; gap: 8px; }
+.hbars .fill { height: 14px; background: var(--ink); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbars .track span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mini { padding: 8px 0; border-top: 1px solid var(--rule); cursor: pointer; display: flex; gap: 10px; justify-content: space-between; }
+.mini:first-of-type { border-top: 0; }
+.mini:hover { background: var(--hover); }
+#tip {
+  position: fixed; z-index: 60; pointer-events: none; background: var(--ink); color: var(--bg);
+  padding: 6px 10px; font-size: 13px; font-weight: 700; box-shadow: var(--shadow); white-space: nowrap;
+}
+#tip[hidden] { display: none; }
+
+/* calendar */
+.cal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 6px solid var(--ink); padding: 12px 0 14px; }
+.cal-head h2 { margin: 0 12px 0 0; font-size: 34px; letter-spacing: -.045em; line-height: 1; flex: 1; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 2px solid var(--ink); }
+.cal-dow { font-size: 11px; font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--ink); }
+.cal-day { min-height: 118px; border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule); padding: 6px 6px 8px; cursor: pointer; min-width: 0; }
+.cal-day:nth-child(7n) { border-right: 0; }
+.cal-day:hover { background: var(--hover); }
+.cal-day.out { color: var(--faint); }
+.cal-day.out .cev { opacity: .55; }
+.cal-num { font-size: 13px; font-weight: 700; display: inline-block; min-width: 24px; padding: 2px 4px; margin-bottom: 4px; }
+.cal-day.today .cal-num { background: var(--accent); color: #fff; }
+.cev {
+  display: block; width: 100%; text-align: left; border: 0; background: none; cursor: pointer; padding: 3px 4px 3px 8px;
+  margin-top: 2px; font-size: 12px; line-height: 1.3; box-shadow: inset 3px 0 var(--c); overflow: hidden;
+}
+.cev:hover { background: var(--bg); outline: 1px solid var(--ink); }
+.cev b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cev span { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cev.interview { background: var(--accent); color: #fff; box-shadow: none; }
+.cev.interview span { color: #fff; }
+.cev.past { opacity: .6; }
+.cal-agenda { display: none; }
+.cal-legend { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.cal-legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; background: var(--c); margin-right: 6px; }
+
+@media (max-width: 720px) {
+  .dash { gap: 0; }
+  .panel, .panel.third, .panel.two-thirds { grid-column: span 12; }
+  .kpi { min-width: 90px; padding-right: 18px; }
+  .kpi b { font-size: 36px; }
+  .remind { grid-template-columns: 1fr auto; }
+  .remind .what { grid-column: 1 / -1; }
+  .cal-head h2 { font-size: 26px; flex-basis: 100%; }
+  .cal-day { min-height: 54px; padding: 3px; }
+  .cal-num { font-size: 12px; min-width: 0; padding: 1px 3px; }
+  .cev { padding: 0; height: 5px; margin-top: 3px; box-shadow: none; background: var(--c); }
+  .cev.interview { background: var(--accent); }
+  .cev b, .cev span { display: none; }
+  .cal-agenda { display: block; margin-top: 18px; }
+}
 @media (max-width: 720px) {
   .top { padding: 16px 16px 10px; gap: 12px 16px; }
   .brand { font-size: 26px; }
+  .views { flex-wrap: wrap; gap: 4px 16px; }
   .wrap { padding: 4px 16px 60px; }
   .stat { min-width: 64px; padding-right: 14px; }
   .stat b { font-size: 36px; }
@@ -284,6 +402,8 @@ select.st option { color: var(--ink); background: var(--bg); }
   <div class="views" role="tablist">
     <button data-view="applications">Applications</button>
     <button data-view="companies">Companies</button>
+    <button data-view="calendar">Calendar</button>
+    <button data-view="dashboard">Dashboard</button>
   </div>
   <input id="search" type="search" placeholder="Search everything  ( / )" autocomplete="off">
   <div class="spacer"></div>
@@ -304,12 +424,17 @@ select.st option { color: var(--ink); background: var(--bg); }
 </header>
 
 <div class="wrap">
-  <section id="summary" class="summary"></section>
-  <section id="upcoming" class="upcoming" hidden></section>
-  <section id="chips" class="chips"></section>
-  <div class="tablewrap"><table id="grid"><thead></thead><tbody></tbody></table><div id="empty" class="empty" hidden></div></div>
+  <div id="list-view">
+    <section id="summary" class="summary"></section>
+    <section id="upcoming" class="upcoming" hidden></section>
+    <section id="chips" class="chips"></section>
+    <div class="tablewrap"><table id="grid"><thead></thead><tbody></tbody></table><div id="empty" class="empty" hidden></div></div>
+  </div>
+  <section id="calendar" hidden></section>
+  <section id="dashboard" class="dash" hidden></section>
 </div>
-<div class="hint"><kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>b</kbd> brief · <kbd>1</kbd>/<kbd>2</kbd> views · <kbd>Esc</kbd> close · <kbd>?</kbd> help</div>
+<div class="hint"><kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>b</kbd> brief · <kbd>1</kbd>–<kbd>4</kbd> views · <kbd>Esc</kbd> close · <kbd>?</kbd> help</div>
+<div id="tip" hidden></div>
 
 <aside id="drawer" class="drawer" hidden></aside>
 <input type="file" id="file-import" accept=".csv,text/csv" hidden>
@@ -327,15 +452,21 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const STATUS_VARS = { Applied: "applied", Screening: "screening", Interview: "interview", Offer: "offer", Rejected: "rejected", Ghosted: "ghosted", Withdrawn: "withdrawn" };
 const statusColor = s => `var(--s-${STATUS_VARS[s] || "other"})`;
 const REMOTE = { "": "—", remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
-const KINDS = { note: "Note", interview: "Interview", call: "Call / chat", email: "Email", status: "Status", other: "Other", applied: "Applied" };
-const kindColor = k => `var(--k-${["note", "interview", "call", "email", "status", "applied"].includes(k) ? k : "other"})`;
+const KINDS = { note: "Note", interview: "Interview", onboarding: "Onboarding", call: "Call / chat", email: "Email", status: "Status", other: "Other", applied: "Applied" };
+const kindColor = k => `var(--k-${["note", "interview", "onboarding", "call", "email", "status", "applied", "joining"].includes(k) ? k : "other"})`;
+// Kinds that are scheduled rather than logged: they count as coming up all day on the day itself.
+const SCHEDULED = ["interview", "onboarding"];
 const TEMPLATES = {
   interview: { kind: "interview", body: "Online interview with ", label: "Interview scheduled" },
+  onboarding: { kind: "onboarding", body: "First day / onboarding", label: "Onboarding" },
   talked: { kind: "call", body: "Talked to ", label: "Talked to…", today: true },
   followup: { kind: "email", body: "Sent a follow-up email", label: "Sent follow-up", today: true },
   reply: { kind: "email", body: "Heard back: ", label: "Heard back", today: true },
   note: { kind: "note", body: "", label: "Note" },
 };
+
+const VIEWS = ["applications", "companies", "calendar", "dashboard"];
+const isList = () => S.view === "applications" || S.view === "companies";
 
 function store(key, value) {
   try {
@@ -345,7 +476,7 @@ function store(key, value) {
 }
 
 const S = {
-  data: null, view: store("view") === "companies" ? "companies" : "applications",
+  data: null, view: VIEWS.includes(store("view")) ? store("view") : "applications", cal: null,
   filters: new Set(), status: null, q: "", rows: [], sel: -1, open: null,
   sort: { applications: { key: "applied", dir: -1 }, companies: { key: "activity", dir: -1 } },
 };
@@ -414,16 +545,18 @@ function ago(n) {
   if (n < 60) return `${Math.floor(n / 7)} weeks ago`;
   return `${Math.floor(n / 30)} months ago`;
 }
+// "22:00" -> "10:00 PM" (or "22:00", following the browser's locale)
+const fmtTime = t => t ? new Date(2000, 0, 1, +t.slice(0, 2), +t.slice(3, 5)).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "";
 const evDate = e => e.event_date || e.created_at.slice(0, 10);
 const byWhen = (x, y) => (x.event_date + (x.event_time || "99")).localeCompare(y.event_date + (y.event_time || "99"));
 const coApps = cid => S.appsBy.get(cid) || [];
 const coEvents = cid => S.eventsBy.get(cid) || [];
-// Upcoming: a future date, or today when it's an interview or its time hasn't passed yet.
+// Upcoming: a future date, or today when it's an interview/onboarding or its time hasn't passed yet.
 function isUpcoming(e) {
   if (!e.event_date || e.event_date < S.data.today) return false;
   if (e.event_date > S.data.today) return true;
   const now = new Date().toTimeString().slice(0, 5);
-  return e.kind === "interview" || (!!e.event_time && e.event_time >= now);
+  return SCHEDULED.includes(e.kind) || (!!e.event_time && e.event_time >= now);
 }
 const upcomingFor = cid => coEvents(cid).filter(isUpcoming).sort(byWhen);
 const latestApp = cid => coApps(cid).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id)[0];
@@ -496,7 +629,7 @@ const COLS = {
     { key: "status", label: "Latest", get: r => latestApp(r.c.id)?.status || "",
       cell: r => { const a = latestApp(r.c.id); return a ? `<span class="pill" style="--c:${statusColor(a.status)}">${esc(a.status || "—")}</span> <span class="muted">${esc(a.position)}</span>` : `<span class="muted">not applied</span>`; } },
     { key: "next", label: "Coming up", cls: "nowrap", get: r => upcomingFor(r.c.id)[0]?.event_date || "~",
-      cell: r => { const e = upcomingFor(r.c.id)[0]; return e ? `${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " " + e.event_time : ""}` : ""; } },
+      cell: r => { const e = upcomingFor(r.c.id)[0]; return e ? `${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " " + fmtTime(e.event_time) : ""}` : ""; } },
     { key: "activity", label: "Last activity", cls: "nowrap", get: r => coActivity(r.c.id),
       cell: r => ago(daysSince(coActivity(r.c.id))) + (coApps(r.c.id).some(isStale) ? `<span class="stale-badge">follow up</span>` : "") },
   ],
@@ -566,7 +699,7 @@ function renderUpcoming() {
   box.innerHTML = `<h2>Coming up</h2>` + list.slice(0, 8).map(e => {
     const c = S.co.get(e.company_id);
     return `<div class="up" data-open="${e.company_id}">
-      <div class="when"><b>${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " · " + e.event_time : ""}</b><span>${ago(daysSince(e.event_date))}</span></div>
+      <div class="when"><b>${fmtDate(e.event_date, { weekday: true })}${e.event_time ? " · " + fmtTime(e.event_time) : ""}</b><span>${ago(daysSince(e.event_date))}</span></div>
       <div><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(KINDS[e.kind] || e.kind)}</div></div>
       <div class="what">${esc(e.body)}</div>
       <button class="btn small" data-brief="${e.company_id}" data-brief-app="${e.application_id || ""}">Brief</button>
@@ -605,6 +738,11 @@ function renderTable() {
 
 function renderMain() {
   $$(".views button").forEach(b => b.classList.toggle("on", b.dataset.view === S.view));
+  $("#list-view").hidden = !isList();
+  $("#calendar").hidden = S.view !== "calendar";
+  $("#dashboard").hidden = S.view !== "dashboard";
+  if (S.view === "calendar") return renderCalendar();
+  if (S.view === "dashboard") return renderDashboard();
   buildRows();
   if (S.sel >= S.rows.length) S.sel = S.rows.length - 1;
   renderSummary();
@@ -620,13 +758,13 @@ function setView(view) {
 }
 
 function moveSel(d) {
-  if (!S.rows.length) return;
+  if (!isList() || !S.rows.length) return;
   S.sel = Math.max(0, Math.min(S.rows.length - 1, S.sel + d));
   $$("#grid tbody tr").forEach(tr => tr.classList.toggle("sel", +tr.dataset.i === S.sel));
   $(`#grid tbody tr[data-i="${S.sel}"]`)?.scrollIntoView({ block: "nearest" });
 }
 function openRow(i) {
-  const r = S.rows[i];
+  const r = isList() && S.rows[i];
   if (r) { S.sel = i; openDrawer(r.c.id, r.a?.id); }
 }
 
@@ -638,6 +776,295 @@ async function setStatus(appId, status) {
     if (S.open) renderDrawer(true);
     toast(`Status set to ${status || "—"}`);
   } catch (err) { toast(err.message, "error"); }
+}
+
+// ---------- calendar items ---------------------------------------------------------------------
+
+const dayStr = n => new Date(n * 864e5).toISOString().slice(0, 10);   // the inverse of dayNum
+const weekStart = n => n - (new Date(n * 864e5).getUTCDay() + 6) % 7;   // weeks start on Monday
+const kindLabel = k => k === "joining" ? "Joining" : KINDS[k] || k;
+
+// Everything with a date between `from` and `to` (inclusive): logged events, plus joining dates.
+// Status changes are left out; they are bookkeeping, not plans.
+function calItems(from, to) {
+  const items = [];
+  for (const e of S.data.events) {
+    if (e.kind === "status" || !e.event_date || e.event_date < from || e.event_date > to) continue;
+    items.push({ ev: e, date: e.event_date, time: e.event_time, kind: e.kind, cid: e.company_id, appId: e.application_id, body: e.body });
+  }
+  for (const a of S.data.applications) {
+    if (!a.joining_date || a.joining_date < from || a.joining_date > to) continue;
+    items.push({ date: a.joining_date, time: "", kind: "joining", cid: a.company_id, appId: a.id, body: `Joining as ${a.position || "new role"}` });
+  }
+  return items.sort((x, y) => (x.date + (x.time || "99")).localeCompare(y.date + (y.time || "99")));
+}
+
+// What's coming up in the next `days` days, today's already-past entries excluded.
+const reminders = days => calItems(S.data.today, dayStr(dayNum(S.data.today) + days))
+  .filter(it => it.ev ? isUpcoming(it.ev) : true);
+
+// ---------- dashboard --------------------------------------------------------------------------
+
+const pct = (n, d) => d ? Math.round(100 * n / d) : 0;
+// Each status keeps one chart colour, by its place in the settings list, so a colour never changes meaning.
+const seriesColor = s => { const i = S.data.config.statuses.indexOf(s); return i >= 0 && i < 8 ? `var(--series-${i + 1})` : "var(--series-none)"; };
+const niceCeil = n => { if (n <= 5) return Math.max(n, 1); const p = 10 ** Math.floor(Math.log10(n)); return [1, 2, 5, 10].map(k => k * p).find(v => v >= n); };
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function renderDashboard() {
+  const d = S.data, cfg = d.config, apps = d.applications;
+  const sent = apps.filter(a => a.date_applied || a.status);
+  const replied = sent.filter(heardBack);
+  const week = apps.filter(a => a.date_applied && daysSince(a.date_applied) < 7 && daysSince(a.date_applied) >= 0).length;
+  const soon = reminders(cfg.reminder_days);
+  const interviews = soon.filter(it => it.kind === "interview").length;
+  const stale = apps.filter(isStale).sort((a, b) => appActivity(a).localeCompare(appActivity(b)));
+  const offers = apps.filter(a => a.status === "Offer").length;
+  const kpi = (n, label, sub = "", hot = false) => `<div class="kpi ${hot ? "hot" : ""}"><b>${n}</b><span>${label}</span>${sub ? `<em>${sub}</em>` : ""}</div>`;
+
+  $("#dashboard").innerHTML = `
+    <div class="kpis">
+      ${kpi(sent.length, "applications", `${week} this week`)}
+      ${kpi(apps.filter(isActive).length, "active")}
+      ${kpi(`${pct(replied.length, sent.length)}<small>%</small>`, "heard back", `${replied.length} of ${sent.length}`)}
+      ${kpi(interviews, `interview${interviews === 1 ? "" : "s"}`, `next ${cfg.reminder_days} days`, interviews > 0)}
+      ${kpi(offers, offers === 1 ? "offer" : "offers")}
+      ${kpi(stale.length, "need a follow-up", `quiet for ${cfg.stale_days}+ days`)}
+    </div>
+    <section class="panel wide">
+      <h2><span>Next ${cfg.reminder_days} days</span><button class="btn small" data-cal-add>+ Add event</button></h2>
+      ${soon.length ? soon.map(reminderRow).join("") : `<p class="empty-note">Nothing scheduled. Add interviews and other dates from the Calendar or a company's log.</p>`}
+    </section>
+    <section class="panel"><h2><span>Applications per week</span><span class="muted">last 12 weeks</span></h2>${weeklyChart()}</section>
+    <section class="panel"><h2><span>By status</span><span class="muted">click to filter</span></h2>${statusDonut()}</section>
+    <section class="panel"><h2><span>Heard back, by month applied</span><span class="muted">recent months are still settling</span></h2>${responseTrend()}</section>
+    <section class="panel"><h2><span>Most asked-for tools</span><span class="muted">across all applications</span></h2>${toolBars()}</section>
+    <section class="panel wide"><h2><span>Needs a follow-up</span><span class="muted">oldest first</span></h2>
+      ${stale.length ? stale.slice(0, 8).map(a => `<div class="mini" data-open="${a.company_id}" data-open-app="${a.id}">
+          <span><b>${esc(S.co.get(a.company_id).name)}</b> <span class="muted">${esc(a.position)}</span></span>
+          <span class="muted">${ago(daysSince(appActivity(a)))}</span></div>`).join("")
+        : `<p class="empty-note">Nothing waiting on you.</p>`}
+    </section>`;
+}
+
+// Heard back: moved past the first status, and not ghosted or withdrawn.
+const heardBack = a => !!a.status && a.status !== S.data.config.statuses[0] && !["Ghosted", "Withdrawn"].includes(a.status);
+
+// Share of each month's applications that got a reply, for the last 6 months.
+function responseTrend() {
+  const months = 6, [ty, tm] = S.data.today.split("-").map(Number);
+  const keys = [...Array(months)].map((_, i) => new Date(Date.UTC(ty, tm - months + i, 1)).toISOString().slice(0, 7));
+  const tally = new Map(keys.map(k => [k, { n: 0, yes: 0 }]));
+  for (const a of S.data.applications) {
+    const t = a.date_applied && tally.get(a.date_applied.slice(0, 7));
+    if (t) { t.n++; if (heardBack(a)) t.yes++; }
+  }
+  const pts = keys.map((k, i) => ({ k, ...tally.get(k), x: (i + .5) * 100 / months }));
+  if (!pts.some(p => p.n)) return `<p class="empty-note">No applications in the last 6 months.</p>`;
+  // Months with no applications have no rate, so the line breaks there instead of dropping to 0%.
+  let d = "", prev = false;
+  for (const p of pts) {
+    if (!p.n) { prev = false; continue; }
+    d += `${prev ? "L" : "M"}${p.x} ${100 - pct(p.yes, p.n)} `;
+    prev = true;
+  }
+  const label = k => new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString(undefined, { month: "short" });
+  const grid = [100, 50, 0].map(v => `<div class="grid" style="bottom:${v}%"><span>${v}%</span></div>`).join("");
+  const cols = pts.map(p => `<div data-tip="${label(p.k)}: ${p.n ? `${pct(p.yes, p.n)}% (${p.yes} of ${plural(p.n, "application")})` : "no applications"}">
+    ${p.n ? `<i class="dot" style="bottom:${pct(p.yes, p.n)}%"></i>` : ""}</div>`).join("");
+  return `<div class="trend" role="img" aria-label="Heard back by month: ${pts.map(p => `${label(p.k)} ${p.n ? pct(p.yes, p.n) + "%" : "none"}`).join(", ")}">
+      ${grid}<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${d}" vector-effect="non-scaling-stroke"></path></svg><div class="cols">${cols}</div></div>
+    <div class="trend-x">${pts.map(p => `<span>${label(p.k)}</span>`).join("")}</div>`;
+}
+
+function reminderRow(it) {
+  const c = S.co.get(it.cid), n = daysSince(it.date);
+  return `<div class="remind ${it.kind}" data-open="${it.cid}" data-open-app="${it.appId || ""}">
+    <div class="when"><b>${fmtDate(it.date, { weekday: true })}${it.time ? " · " + fmtTime(it.time) : ""}</b><span>${ago(n)}</span></div>
+    <div class="what"><b>${esc(c.name)}</b> <span class="k" style="--c:${kindColor(it.kind)}">${esc(kindLabel(it.kind))}</span><br><span class="muted">${esc(it.body)}</span></div>
+    ${it.kind === "interview" ? `<button class="btn small" data-brief="${it.cid}" data-brief-app="${it.appId || ""}">Brief</button>` : "<span></span>"}
+  </div>`;
+}
+
+function weeklyChart() {
+  const today = dayNum(S.data.today), thisWeek = weekStart(today), weeks = 12;
+  const counts = new Array(weeks).fill(0);
+  for (const a of S.data.applications) {
+    if (!a.date_applied) continue;
+    const i = weeks - 1 - (thisWeek - weekStart(dayNum(a.date_applied))) / 7;
+    if (i >= 0 && i < weeks) counts[i]++;
+  }
+  if (!counts.some(Boolean)) return `<p class="empty-note">No applications in the last 12 weeks.</p>`;
+  const top = niceCeil(Math.max(...counts));
+  const lines = [top, top / 2].filter(v => Number.isInteger(v) && v > 0)
+    .map(v => `<div class="grid" style="bottom:${100 * v / top}%"><span>${v}</span></div>`).join("");
+  const start = i => thisWeek - (weeks - 1 - i) * 7;
+  const cols = counts.map((n, i) => `<div class="col ${i === weeks - 1 ? "now" : ""}" data-tip="${i === weeks - 1 ? "This week" : "Week of " + fmtDate(dayStr(start(i)))}: ${plural(n, "application")}">
+      <div class="bar" style="height:${100 * n / top}%"></div></div>`).join("");
+  const labels = counts.map((_, i) => `<span>${(weeks - 1 - i) % 3 ? "" : i === weeks - 1 ? "This week" : fmtDate(dayStr(start(i)))}</span>`).join("");
+  return `<div class="bars" role="img" aria-label="Applications per week: ${counts.join(", ")}">${lines}${cols}</div><div class="bar-x">${labels}</div>`;
+}
+
+function statusDonut() {
+  const cfg = S.data.config, apps = S.data.applications;
+  if (!apps.length) return `<p class="empty-note">No applications yet.</p>`;
+  const counts = new Map();
+  for (const a of apps) {
+    const key = cfg.statuses.includes(a.status) ? a.status : "";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const rows = [...cfg.statuses, ""].filter(s => counts.get(s)).map(s => ({ s, n: counts.get(s), label: s || "Other / none", color: s ? seriesColor(s) : "var(--series-none)" }));
+  const R = 60, C = 2 * Math.PI * R, gap = rows.length > 1 ? 2 : 0;
+  let offset = 0;
+  const segs = rows.map(r => {
+    const len = C * r.n / apps.length;
+    const seg = `<circle class="seg" r="${R}" cx="85" cy="85" stroke="${r.color}" stroke-dasharray="${Math.max(len - gap, .5)} ${C}" stroke-dashoffset="${-offset}"
+      transform="rotate(-90 85 85)" data-tip="${esc(r.label)}: ${r.n} (${pct(r.n, apps.length)}%)"></circle>`;
+    offset += len;
+    return seg;
+  }).join("");
+  const legend = rows.map(r => `<i style="--c:${r.color}"></i>${r.s ? `<button data-legend-status="${esc(r.s)}">${esc(r.label)}</button>` : `<span>${esc(r.label)}</span>`}<b>${r.n}</b><span class="muted">${pct(r.n, apps.length)}%</span>`).join("");
+  return `<div class="donut-wrap">
+    <svg class="donut" viewBox="0 0 170 170" role="img" aria-label="Applications by status">${segs}
+      <text x="85" y="84" text-anchor="middle" font-size="34" font-weight="700" letter-spacing="-1.5">${apps.length}</text>
+      <text x="85" y="104" text-anchor="middle" font-size="11" font-weight="700" style="fill:var(--muted)">applications</text></svg>
+    <div class="legend">${legend}</div></div>`;
+}
+
+function toolBars() {
+  const counts = new Map();
+  for (const a of S.data.applications) for (const t of splitTools(a.tools)) {
+    const k = t.toLowerCase();
+    const cur = counts.get(k) || { t, n: 0 };
+    cur.n++; counts.set(k, cur);
+  }
+  const top = [...counts.values()].sort((a, b) => b.n - a.n || a.t.localeCompare(b.t)).slice(0, 8);
+  if (!top.length) return `<p class="empty-note">Add tools to your applications to see which come up most.</p>`;
+  const max = top[0].n, total = S.data.applications.length;
+  return `<div class="hbars">${top.map(x => `<span class="lbl" title="${esc(x.t)}">${esc(x.t)}</span>
+    <div class="track" data-tip="${esc(x.t)}: in ${x.n} of ${plural(total, "application")}"><div class="fill" style="width:${Math.max(85 * x.n / max, 1)}%"></div><span>${x.n}</span></div>`).join("")}</div>`;
+}
+
+// ---------- calendar ---------------------------------------------------------------------------
+
+function shiftMonth(n) {
+  const [y, m] = S.cal.split("-").map(Number);
+  S.cal = new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const today = S.data.today;
+  if (!S.cal) S.cal = today.slice(0, 7);
+  const [y, m] = S.cal.split("-").map(Number);
+  const first = Date.UTC(y, m - 1, 1) / 864e5, last = Date.UTC(y, m, 1) / 864e5 - 1;
+  const start = weekStart(first), end = weekStart(last) + 6;
+  const items = calItems(dayStr(start), dayStr(end));
+  const byDay = new Map();
+  for (const it of items) { if (!byDay.has(it.date)) byDay.set(it.date, []); byDay.get(it.date).push(it); }
+  const title = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const dows = [...Array(7)].map((_, i) => new Date(Date.UTC(2024, 0, 1 + i)).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }));
+  const chip = it => {
+    const name = S.co.get(it.cid)?.name || "";
+    const past = it.date < today || (it.date === today && it.time && !isUpcoming(it.ev || it));
+    const full = `${it.time ? fmtTime(it.time) + " · " : ""}${kindLabel(it.kind)} · ${name}${it.body ? "\n" + it.body : ""}`;
+    const target = it.ev ? `data-cal-ev="${it.ev.id}"` : `data-cal-join="${it.appId}" data-cid="${it.cid}"`;
+    return `<button class="cev ${it.kind} ${past ? "past" : ""}" style="--c:${kindColor(it.kind)}" ${target} title="${esc(full)}">
+      <b>${it.time ? fmtTime(it.time) + " " : ""}${esc(name)}</b><span>${esc(kindLabel(it.kind))}${it.body ? " · " + esc(it.body) : ""}</span></button>`;
+  };
+  let cells = "";
+  for (let n = start; n <= end; n++) {
+    const ds = dayStr(n), list = byDay.get(ds) || [];
+    cells += `<div class="cal-day ${n < first || n > last ? "out" : ""} ${ds === today ? "today" : ""}" data-day="${ds}" title="Add an event on ${esc(fmtDate(ds, { weekday: true, year: true }))}">
+      <span class="cal-num">${+ds.slice(8)}</span>${list.map(chip).join("")}</div>`;
+  }
+  const month = items.filter(it => it.date >= dayStr(first) && it.date <= dayStr(last));
+  $("#calendar").innerHTML = `
+    <div class="cal-head">
+      <h2>${esc(title)}</h2>
+      <button class="btn small" data-cal="-1" title="Previous month (←)">‹</button>
+      <button class="btn small" data-cal="0">Today</button>
+      <button class="btn small" data-cal="1" title="Next month (→)">›</button>
+      <button class="btn primary" data-cal-add>+ Add event <kbd>n</kbd></button>
+    </div>
+    <div class="cal-grid">${dows.map(d => `<div class="cal-dow">${esc(d)}</div>`).join("")}${cells}</div>
+    <div class="cal-legend">${["interview", "onboarding", "call", "email", "note", "joining"].map(k => `<span style="--c:${k === "interview" ? "var(--accent)" : kindColor(k)}">${kindLabel(k)}</span>`).join("")}
+      <span class="muted" style="margin-left:auto">Click a day to add an event</span></div>
+    <div class="cal-agenda upcoming">${month.length ? `<h2>This month</h2>` + month.map(reminderRow).join("") : ""}</div>`;
+}
+
+// Add or edit one dated event (interview, onboarding, call…) from anywhere.
+function openEventForm({ id, date, cid } = {}) {
+  const ev = id ? findRow("events", id) : null;
+  const co = S.co.get(ev ? ev.company_id : cid);
+  const kinds = Object.entries(KINDS).filter(([k]) => !["status", "applied"].includes(k));
+  const kind = ev?.kind || "interview";
+  const m = openModal(`
+    <h2>${ev ? "Edit event" : "New event"}</h2>
+    <form id="evf" autocomplete="off">
+      <div class="grid2">
+        ${fld("Company", `<input type="text" name="name" list="co-list" required value="${esc(co?.name || "")}" ${ev ? "disabled" : ""}>`)}
+        ${fld("For", `<select name="app"></select>`)}
+      </div>
+      <div class="cohint" id="evf-hint"></div>
+      <div class="grid3">
+        ${fld("What", `<select name="kind">${kinds.map(([k, l]) => `<option value="${k}" ${k === kind ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
+        ${fld("Date", `<input type="date" name="date" required value="${esc(ev?.event_date || date || "")}">`)}
+        ${fld("Time", `<input type="time" name="time" value="${esc(ev?.event_time || "")}">`)}
+      </div>
+      ${fld("Details", `<textarea name="body" rows="2" placeholder="e.g. Technical round with Sam, Zoom link in the invite">${esc(ev?.body || "")}</textarea>`)}
+      <div class="actions">
+        ${ev ? `<button type="button" class="btn danger" id="evf-del" style="margin-right:auto">Delete</button><button type="button" class="btn" id="evf-open">Open company</button>` : ""}
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Save <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </form>`);
+  const form = $("#evf", m), F = form.elements, hint = $("#evf-hint", m);
+  const findCo = () => S.data.companies.find(c => c.name.toLowerCase() === F.name.value.trim().toLowerCase());
+  const syncApps = () => {
+    const c = ev ? co : findCo();
+    const apps = c ? coApps(c.id).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id) : [];
+    const pick = ev ? ev.application_id : (apps.find(isActive) || apps[0])?.id;
+    F.app.innerHTML = `<option value="">Whole company</option>` + apps.map(a => `<option value="${a.id}" ${a.id === pick ? "selected" : ""}>${esc(a.position || "Untitled")}${a.status ? " · " + esc(a.status) : ""}</option>`).join("");
+    hint.innerHTML = ev || !F.name.value.trim() ? "" : c ? "" : `<b>${esc(F.name.value.trim())}</b> isn't tracked yet. Pick one from the list, or add the company first.`;
+  };
+  F.name.addEventListener("input", syncApps);
+  syncApps();
+
+  const save = async () => {
+    const name = F.name.value.trim();
+    if (!ev && !name) { F.name.focus(); return toast("Which company is it with?", "error"); }
+    if (!ev && !findCo()) { F.name.focus(); return toast(`${name} isn't tracked yet. Add the company first.`, "error"); }
+    if (!F.date.value) { F.date.focus(); return toast("Pick a date", "error"); }
+    const body = { application_id: F.app.value ? +F.app.value : null, kind: F.kind.value, body: F.body.value, event_date: F.date.value, event_time: F.time.value };
+    try {
+      if (ev) await api("PATCH", `/api/events/${ev.id}`, body);
+      else {
+        await api("POST", "/api/events", { ...body, company_id: findCo().id });
+      }
+      closeModal();
+      if (S.view === "calendar") S.cal = F.date.value.slice(0, 7);
+      await reload(); renderMain();
+      if (S.open) renderDrawer(true);
+      toast(`${kindLabel(body.kind)} ${ev ? "saved" : "added"}: ${fmtDate(body.event_date, { weekday: true })}${body.event_time ? " at " + fmtTime(body.event_time) : ""}`);
+    } catch (err) { toast(err.message, "error"); }
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); save(); });
+  form.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); } });
+  $("[data-close]", m).onclick = closeModal;
+  if (ev) {
+    $("#evf-open", m).onclick = () => { closeModal(); openDrawer(ev.company_id, ev.application_id); };
+    $("#evf-del", m).onclick = async () => {
+      if (!confirm("Delete this event?")) return;
+      try {
+        await api("DELETE", `/api/events/${ev.id}`);
+        closeModal(); await reload(); renderMain();
+        if (S.open) renderDrawer(true);
+        toast("Deleted");
+      } catch (err) { toast(err.message, "error"); }
+    };
+    F.date.focus();
+  } else (co ? F.date : F.name).focus();
 }
 
 // ---------- drawer -----------------------------------------------------------------------------
@@ -678,7 +1105,7 @@ function renderDrawer(keepScroll) {
     <button class="btn ghost" data-act="close" title="Close (Esc)">✕</button>
   </div>
   <div class="dbody">
-    ${next ? `<div class="callout"><b>Coming up ${esc(ago(daysSince(next.event_date)))}:</b> ${fmtDate(next.event_date, { weekday: true })}${next.event_time ? " at " + esc(next.event_time) : ""}. ${esc(next.body)}</div>` : ""}
+    ${next ? `<div class="callout"><b>Coming up ${esc(ago(daysSince(next.event_date)))}:</b> ${fmtDate(next.event_date, { weekday: true })}${next.event_time ? " at " + esc(fmtTime(next.event_time)) : ""}. ${esc(next.body)}</div>` : ""}
     <section class="sec">
       <div class="grid2">
         ${fld("Website", linkField(inp("companies", c.id, "website", c.website, { ph: "company.com" }), c.website))}
@@ -785,7 +1212,7 @@ function timeline(cid, apps) {
     return `<div class="ev ${future.includes(e) ? "future" : ""}" style="--c:${color}" ${e.id ? `data-ev="${e.id}"` : ""}>
       <div class="dot"></div>
       <div class="evmain">
-        <div class="evmeta"><span class="k">${esc(KINDS[e.kind] || e.kind)}</span><span>${fmtDate(e.when, { weekday: true })}${e.event_time ? " · " + esc(e.event_time) : ""}</span><span>· ${ago(daysSince(e.when))}</span>${tag}</div>
+        <div class="evmeta"><span class="k">${esc(KINDS[e.kind] || e.kind)}</span><span>${fmtDate(e.when, { weekday: true })}${e.event_time ? " · " + esc(fmtTime(e.event_time)) : ""}</span><span>· ${ago(daysSince(e.when))}</span>${tag}</div>
         <div class="evbody">${esc(e.body)}</div>
       </div>
       <div class="evact">${e.id ? `<button data-act="edit-ev" data-id="${e.id}">Edit</button><button data-act="del-ev" data-id="${e.id}" title="Delete">✕</button>` : ""}</div>
@@ -857,7 +1284,7 @@ function useTemplate(key) {
   $("#log-kind").value = t.kind;
   ta.value = t.body;
   if (t.today && !$("#log-date").value) $("#log-date").value = S.data.today;
-  if (key === "interview") $("#log-date").value = "";
+  if (SCHEDULED.includes(key)) $("#log-date").value = "";
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
 }
@@ -1078,8 +1505,8 @@ function openQuickAdd(prefill = {}) {
   if (prefill.name) F.name.dispatchEvent(new Event("input"));
 }
 
-// The New button and `n` add a company on the Companies tab, an application everywhere else.
-const openNew = () => S.view === "companies" ? openCompanyForm() : openQuickAdd();
+// The New button and `n` add a company on the Companies tab, an event on the Calendar, an application everywhere else.
+const openNew = () => S.view === "companies" ? openCompanyForm() : S.view === "calendar" ? openEventForm() : openQuickAdd();
 
 function openCompanyForm() {
   const m = openModal(`
@@ -1185,9 +1612,10 @@ async function importFile(file) {
 
 function showShortcuts() {
   const m = openModal(`<h2>Keyboard shortcuts</h2><div class="shortcuts">
-    <kbd>n</kbd><span>New application (a new company on the Companies tab)</span><kbd>/</kbd><span>Search</span>
+    <kbd>n</kbd><span>New application (a company on the Companies tab, an event on the Calendar)</span><kbd>/</kbd><span>Search</span>
     <kbd>j</kbd> <kbd>k</kbd><span>Move down / up the list</span><kbd>Enter</kbd><span>Open the selected row</span>
-    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd> <kbd>2</kbd><span>Applications / Companies</span>
+    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd>–<kbd>4</kbd><span>Applications / Companies / Calendar / Dashboard</span>
+    <kbd>←</kbd> <kbd>→</kbd><span>Previous / next month on the Calendar</span>
     <kbd>Ctrl+Enter</kbd><span>Save the form, or add the log entry</span><kbd>Esc</kbd><span>Close / leave a field</span>
   </div><div class="actions"><button class="btn" data-close>Close</button></div>`);
   $("[data-close]", m).onclick = closeModal;
@@ -1358,7 +1786,7 @@ function drawBrief(canvas, cid, appId) {
 
   // ---- next up
   if (next) {
-    const when = `${asDate(next.event_date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${next.event_time ? ", " + next.event_time : ""}  (${ago(daysSince(next.event_date))})`;
+    const when = `${asDate(next.event_date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${next.event_time ? ", " + fmtTime(next.event_time) : ""}  (${ago(daysSince(next.event_date))})`;
     y += section(false, P, y, W - 2 * P, "Next up", stack([
       T(when, { size: 26, weight: 700, ls: -.6, color: "#fff" }),
       T(next.body, { size: 17, max: 4, gap: 8, color: "#fff" }),
@@ -1432,7 +1860,7 @@ function drawBrief(canvas, cid, appId) {
 function wire() {
   $$(".views button").forEach(b => b.onclick = () => setView(b.dataset.view));
   $("#btn-new").onclick = openNew;
-  $("#search").addEventListener("input", e => { S.q = e.target.value; S.sel = -1; renderMain(); });
+  $("#search").addEventListener("input", e => { S.q = e.target.value; S.sel = -1; isList() ? renderMain() : setView("applications"); });
   $("#search").addEventListener("keydown", e => {
     if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); e.target.blur(); S.sel = -1; moveSel(1); if (e.key === "Enter" && S.rows.length === 1) openRow(0); }
   });
@@ -1474,8 +1902,17 @@ function wire() {
     }
     const brief = t.closest("[data-brief]");
     if (brief) { e.stopPropagation(); return openBrief(+brief.dataset.brief, +brief.dataset.briefApp || null); }
+    const legend = t.closest("[data-legend-status]");
+    if (legend) { S.status = legend.dataset.legendStatus; return setView("applications"); }
+    const cal = t.closest("[data-cal]");
+    if (cal) { if (+cal.dataset.cal) return shiftMonth(+cal.dataset.cal); S.cal = S.data.today.slice(0, 7); return renderCalendar(); }
+    if (t.closest("[data-cal-add]")) return openEventForm();
+    const cev = t.closest(".cev");
+    if (cev) return cev.dataset.calEv ? openEventForm({ id: +cev.dataset.calEv }) : openDrawer(+cev.dataset.cid, +cev.dataset.calJoin);
+    const day = t.closest("[data-day]");
+    if (day) return openEventForm({ date: day.dataset.day });
     const up = t.closest("[data-open]");
-    if (up) return openDrawer(+up.dataset.open);
+    if (up) return openDrawer(+up.dataset.open, +up.dataset.openApp || undefined);
   });
 
   $("#grid thead").addEventListener("click", e => {
@@ -1517,6 +1954,17 @@ function wire() {
     }
   });
 
+  // Chart tooltips: anything with data-tip shows it next to the pointer.
+  const tip = $("#tip");
+  document.addEventListener("mousemove", e => {
+    const el = e.target.closest?.("[data-tip]");
+    if (!el) { tip.hidden = true; return; }
+    tip.textContent = el.dataset.tip;
+    tip.hidden = false;
+    tip.style.left = Math.max(8, Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8)) + "px";
+    tip.style.top = Math.max(8, e.clientY - 40) + "px";
+  });
+
   $("#file-import").addEventListener("change", e => {
     const file = e.target.files[0];
     e.target.value = "";
@@ -1543,6 +1991,9 @@ function wire() {
       b: () => S.open && openBrief(S.open.cid, S.open.appId),
       1: () => setView("applications"),
       2: () => setView("companies"),
+      3: () => setView("calendar"),
+      4: () => setView("dashboard"),
+      ...(S.view === "calendar" ? { ArrowLeft: () => shiftMonth(-1), ArrowRight: () => shiftMonth(1) } : {}),
       "?": () => showShortcuts(),
     };
     if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
