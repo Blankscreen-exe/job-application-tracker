@@ -6,13 +6,15 @@ It runs in your browser, keeps everything in one file on your computer, and need
 - **Quick entry.** Paste a job link and the company is filled in for you (works with Greenhouse, Lever,
   Ashby, Workable, Workday, Recruitee and company career sites). Save with `Ctrl+Enter`, or
   "Save & add another" for a batch.
-- **Everything editable in place.** Click a row to open the company panel; every field saves as you go.
+- **A tidy company panel.** Click a row to open it. Details, applications and people read as plain text;
+  Edit on any part opens a form right there (`Ctrl+Enter` saves, `Esc` cancels).
 - **A log per company.** Calls, emails, interviews and notes, with an optional date and time. Future
   entries appear under *Coming up* at the top of the page. Status changes are logged automatically.
-- **People.** Recruiters, interviewers and referrers, with what to remember about each.
+- **People.** Recruiters, interviewers and referrers as cards, with what to remember about each.
+  "+ Add person" opens a small form; a name is required.
 - **Interview brief.** One click (or `b`) makes a PNG summary of the company: what they do, the role,
   tools, the people you'll meet, your notes and recent history. Download it or copy it to the clipboard.
-- **Dashboard.** Headline numbers, reminders for everything scheduled in the next 7 days (interviews
+- **Dashboard.** The page the tracker opens on: headline numbers, reminders for everything scheduled in the next 7 days (interviews
   highlighted), applications per week, the status breakdown, how often you hear back by month, and
   the tools that come up most.
 - **Calendar.** A month view of interviews, onboarding, calls and other dated entries, plus joining dates.
@@ -102,7 +104,7 @@ Edit `data/config.json` (created on first run):
 ## Keyboard
 
 `n` new (an application, a company on the Companies tab, an event on the Calendar) · `/` search · `j`/`k` move · `Enter` open · `b` brief ·
-`1`–`4` Applications / Companies / Calendar / Dashboard · `←`/`→` change month on the Calendar · `Esc` close ·
+`1`–`4` Dashboard / Applications / Companies / Calendar · `←`/`→` change month on the Calendar · `Esc` close ·
 `Ctrl+Enter` save a form or add a log entry · `?` all shortcuts
 
 ## Privacy

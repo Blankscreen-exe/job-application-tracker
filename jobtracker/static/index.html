@@ -77,8 +77,6 @@ textarea { resize: vertical; line-height: 1.4; }
 select { cursor: pointer; }
 input:focus, select:focus, textarea:focus { outline: none; border-bottom: 2px solid var(--accent); margin-bottom: -1px; }
 .btn:focus-visible, .chip:focus-visible, .stat:focus-visible, .views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input.saved, textarea.saved, select.saved { background: var(--hover); transition: background .3s; }
-input.bad, textarea.bad { border-bottom: 2px solid var(--accent); }
 
 /* top bar */
 .top {
@@ -185,32 +183,48 @@ select.st option { color: var(--ink); background: var(--bg); }
 }
 .drawer[hidden] { display: none; }
 .dh { display: flex; gap: 8px; align-items: center; padding: 16px 24px 12px; }
-.dtitle { font-size: 30px !important; font-weight: 700; letter-spacing: -.04em; border-bottom-color: transparent !important; padding: 2px 0 !important; }
-.dtitle:hover { border-bottom-color: var(--rule) !important; }
-.dtitle:focus { border-bottom-color: var(--accent) !important; }
-.dbody { overflow-y: auto; padding: 0 24px 40px; flex: 1; }
-.sec { padding: 12px 0 16px; border-top: 2px solid var(--ink); }
-.sech { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.dtitle { flex: 1; margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.04em; line-height: 1.1; overflow-wrap: anywhere; }
+.dbody { overflow-y: auto; padding: 0 24px 40px; flex: 1; line-height: 1.5; }
+.sec { padding: 14px 0 24px; border-top: 2px solid var(--ink); }
+.sech { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sech h3 { margin: 0; font-size: 12px; font-weight: 700; }
 .fld { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; min-width: 0; }
 .fld > span { font-size: 11px; font-weight: 700; color: var(--muted); }
-.withlink { display: flex; gap: 6px; align-items: center; }
-.withlink a { flex: none; text-decoration: none; color: var(--accent); padding: 2px 4px; font-weight: 700; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 20px; }
 .checks { display: flex; gap: 22px; margin: 2px 0 14px; }
 .check { display: flex; gap: 7px; align-items: center; cursor: pointer; font-weight: 700; font-size: 14px; }
 .check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
-.card { border-top: 1px solid var(--rule); padding: 12px 0 8px; }
-.sech + .card { border-top: 0; padding-top: 0; }
+/* read view: labelled text, a muted meta line, and Edit buttons that swap in a form */
+.ro { margin: 0 0 14px; }
+.ro > span { font-size: 11px; font-weight: 700; color: var(--muted); }
+.ro p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.metaline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; font-size: 14px; margin-bottom: 12px; }
+.metaline i { font-style: normal; color: var(--faint); padding: 0 8px; }
+.metaline .ext { margin-left: 0; font-size: 14px; }
+.card { border-top: 1px solid var(--rule); padding: 14px 0 10px; }
+.card:first-of-type, .eform + .card { border-top: 0; padding-top: 2px; }
 .card.hl { box-shadow: inset 4px 0 var(--accent); padding-left: 14px; }
-.card-h { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
-.card-h input { font-weight: 700; font-size: 17px; flex: 1; }
+.card-h { display: flex; gap: 12px; align-items: center; margin-bottom: 4px; }
+.card-h h4 { margin: 0; font-size: 18px; letter-spacing: -.02em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .card-h select.st { flex: none; }
-.card-f { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
-.person { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 10px 0; border-top: 1px solid var(--rule); }
-.sech + .person { border-top: 0; padding-top: 0; }
-.person .grid3 { margin-bottom: 4px; }
+.card .tools { margin: -4px 0 12px; }
+.card-a, .pcard-a { display: flex; gap: 2px; }
+.card-a { justify-content: flex-end; margin-top: -4px; }
+.card-a .btn, .pcard-a .btn { color: var(--muted); font-weight: 700; }
+.card-a .btn:hover, .pcard-a .btn:hover { color: var(--ink); }
+.card-a .btn.danger:hover, .pcard-a .btn.danger:hover { color: var(--accent); }
+.pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.pcards .eform { grid-column: 1 / -1; margin: 0; }
+.pcard { border: 1px solid var(--rule); padding: 10px 12px 12px; min-width: 0; overflow-wrap: anywhere; }
+.pcard:hover { border-color: var(--ink); }
+.pcard-h { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.pcard-h b { font-size: 16px; }
+.pcard .muted { font-size: 13px; }
+.pcard .ext { margin-left: 0; font-size: 13px; }
+.pcard p { margin: 6px 0 0; font-size: 14px; white-space: pre-wrap; }
+.eform { border: 2px solid var(--ink); padding: 12px 14px 12px; margin-bottom: 14px; }
+.eform-f { display: flex; gap: 8px; justify-content: flex-end; }
 .callout { margin: 4px 0 16px; padding: 12px 14px; background: var(--accent); color: #fff; font-weight: 700; }
 .callout b { color: #fff; }
 .empty-note { color: var(--faint); font-size: 13px; margin: 0; }
@@ -400,10 +414,10 @@ select.st option { color: var(--ink); background: var(--bg); }
 <header class="top">
   <div class="brand">Job Tracker</div>
   <div class="views" role="tablist">
+    <button data-view="dashboard">Dashboard</button>
     <button data-view="applications">Applications</button>
     <button data-view="companies">Companies</button>
     <button data-view="calendar">Calendar</button>
-    <button data-view="dashboard">Dashboard</button>
   </div>
   <input id="search" type="search" placeholder="Search everything  ( / )" autocomplete="off">
   <div class="spacer"></div>
@@ -465,7 +479,7 @@ const TEMPLATES = {
   note: { kind: "note", body: "", label: "Note" },
 };
 
-const VIEWS = ["applications", "companies", "calendar", "dashboard"];
+const VIEWS = ["dashboard", "applications", "companies", "calendar"];
 const isList = () => S.view === "applications" || S.view === "companies";
 
 function store(key, value) {
@@ -476,7 +490,7 @@ function store(key, value) {
 }
 
 const S = {
-  data: null, view: VIEWS.includes(store("view")) ? store("view") : "applications", cal: null,
+  data: null, view: "dashboard", cal: null,   // the tracker always opens on the dashboard
   filters: new Set(), status: null, q: "", rows: [], sel: -1, open: null,
   sort: { applications: { key: "applied", dir: -1 }, companies: { key: "activity", dir: -1 } },
 };
@@ -752,7 +766,7 @@ function renderMain() {
 }
 
 function setView(view) {
-  S.view = view; S.sel = -1; store("view", view);
+  S.view = view; S.sel = -1;
   if (view === "applications") S.filters.delete("notapplied");
   renderMain();
 }
@@ -1069,12 +1083,7 @@ function openEventForm({ id, date, cid } = {}) {
 
 // ---------- drawer -----------------------------------------------------------------------------
 
-const attrs = (t, id, f) => `data-t="${t}" data-id="${id}" data-f="${f}"`;
-const inp = (t, id, f, v, o = {}) => `<input type="${o.type || "text"}" ${attrs(t, id, f)} value="${esc(v)}" placeholder="${esc(o.ph || "")}" class="${o.cls || ""}">`;
-const area = (t, id, f, v, ph = "", rows = 2) => `<textarea ${attrs(t, id, f)} rows="${rows}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
-const chk = (t, id, f, v, label) => `<label class="check"><input type="checkbox" ${attrs(t, id, f)} ${v ? "checked" : ""}>${label}</label>`;
 const fld = (label, html) => `<label class="fld"><span>${label}</span>${html}</label>`;
-const linkField = (input, url) => `<div class="withlink">${input}${url ? `<a href="${esc(href(url))}" target="_blank" rel="noopener" title="Open">↗</a>` : ""}</div>`;
 
 function openDrawer(cid, appId) {
   S.open = { cid, appId, fresh: true };
@@ -1087,42 +1096,42 @@ function closeDrawer() {
   $("#drawer").hidden = true;
 }
 
+// The panel shows everything as text. Edit turns one part into a form (S.open.edit says which:
+// "company", "app:<id>", "app:new", "person:<id>" or "person:new"); Save or Cancel turns it back.
 function renderDrawer(keepScroll) {
   const drawer = $("#drawer");
-  const { cid, appId } = S.open;
+  const { cid, appId, edit } = S.open;
   const c = S.co.get(cid);
   if (!c) return closeDrawer();
   const scroll = keepScroll ? $(".dbody", drawer)?.scrollTop || 0 : 0;
   const draft = keepScroll ? logDraft() : null;
+  const formDraft = keepScroll ? editDraft() : null;
   const apps = coApps(cid).slice().sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || "") || b.id - a.id);
   const people = S.peopleBy.get(cid) || [];
   const next = upcomingFor(cid)[0];
 
   drawer.innerHTML = `
   <div class="dh">
-    <input type="text" class="dtitle" ${attrs("companies", c.id, "name")} value="${esc(c.name)}" aria-label="Company name">
+    <h2 class="dtitle">${esc(c.name)}</h2>
     <button class="btn" data-act="brief" title="Summary image for interview prep">Brief <kbd>b</kbd></button>
     <button class="btn ghost" data-act="close" title="Close (Esc)">✕</button>
   </div>
   <div class="dbody">
     ${next ? `<div class="callout"><b>Coming up ${esc(ago(daysSince(next.event_date)))}:</b> ${fmtDate(next.event_date, { weekday: true })}${next.event_time ? " at " + esc(fmtTime(next.event_time)) : ""}. ${esc(next.body)}</div>` : ""}
     <section class="sec">
-      <div class="grid2">
-        ${fld("Website", linkField(inp("companies", c.id, "website", c.website, { ph: "company.com" }), c.website))}
-        ${fld("Remote", `<select ${attrs("companies", c.id, "remote")}>${Object.entries(REMOTE).map(([v, l]) => `<option value="${v}" ${v === c.remote ? "selected" : ""}>${v ? l : "Not sure"}</option>`).join("")}</select>`)}
-      </div>
-      <div class="checks">${chk("companies", c.id, "is_big_tech", c.is_big_tech, "Big tech")}${chk("companies", c.id, "urgent", c.urgent, "★ Urgent: apply soon")}</div>
-      ${fld("What they do", area("companies", c.id, "about", c.about, "Products, customers, size, anything worth remembering. Shows on the brief."))}
-      ${fld("References", area("companies", c.id, "refs", c.refs, "Who referred you, who you know there", 1))}
-      ${fld("Notes", area("companies", c.id, "notes", c.notes, "Anything else", 2))}
+      <div class="sech"><h3>About</h3>${edit === "company" ? "" : `<button class="btn small" data-act="edit" data-edit="company">Edit</button>`}</div>
+      ${edit === "company" ? companyForm(c) : companyView(c)}
     </section>
     <section class="sec">
-      <div class="sech"><h3>Applications (${apps.length})</h3><button class="btn small" data-act="add-app">+ Add application</button></div>
-      ${apps.map(a => appCard(a, a.id === appId)).join("") || `<p class="empty-note">Not applied yet.</p>`}
+      <div class="sech"><h3>Applications (${apps.length})</h3><button class="btn small" data-act="edit" data-edit="app:new">+ Add application</button></div>
+      ${edit === "app:new" ? appForm(null) : ""}
+      ${apps.map(a => edit === `app:${a.id}` ? appForm(a) : appCard(a, a.id === appId)).join("") || (edit === "app:new" ? "" : `<p class="empty-note">Not applied yet.</p>`)}
     </section>
     <section class="sec">
-      <div class="sech"><h3>People</h3><button class="btn small" data-act="add-person">+ Add person</button></div>
-      ${people.map(personRow).join("") || `<p class="empty-note">Recruiters, interviewers, referrers. They show up on the brief.</p>`}
+      <div class="sech"><h3>People (${people.length})</h3><button class="btn small" data-act="edit" data-edit="person:new">+ Add person</button></div>
+      ${edit === "person:new" ? personForm(null) : ""}
+      ${people.length ? `<div class="pcards">${people.map(p => edit === `person:${p.id}` ? personForm(p) : personCard(p)).join("")}</div>`
+        : edit === "person:new" ? "" : `<p class="empty-note">Recruiters, interviewers, referrers. They show up on the brief.</p>`}
     </section>
     <section class="sec">
       <div class="sech"><h3>Log</h3></div>
@@ -1134,35 +1143,148 @@ function renderDrawer(keepScroll) {
 
   $$("textarea", drawer).forEach(autosize);
   if (draft) restoreLogDraft(draft);
+  if (formDraft && formDraft.key === edit) restoreEditDraft(formDraft);
   const body = $(".dbody", drawer);
   if (keepScroll) body.scrollTop = scroll;
   else if (S.open.fresh && appId) $(`.card[data-app="${appId}"]`, drawer)?.scrollIntoView({ block: "nearest" });
   S.open.fresh = false;
 }
 
-function appCard(a, highlight) {
-  const t = "applications", id = a.id, days = daysSince(a.date_applied);
-  return `<div class="card app ${highlight ? "hl" : ""}" data-app="${id}">
-    <div class="card-h">${inp(t, id, "position", a.position, { ph: "Position" })}${statusSelect(a)}</div>
-    ${fld("Job post", linkField(inp(t, id, "job_url", a.job_url, { ph: "https://…" }), a.job_url))}
-    <div class="grid3">
-      ${fld(`Date applied${days != null ? ` <span class="muted">(${ago(days)})</span>` : ""}`, inp(t, id, "date_applied", a.date_applied, { type: "date" }))}
-      ${fld("Offer", inp(t, id, "offer", a.offer, { ph: "Salary, terms" }))}
-      ${fld("Joining date", inp(t, id, "joining_date", a.joining_date, { type: "date" }))}
+// A labelled block of plain text, left out when empty.
+const ro = (label, text) => text ? `<div class="ro"><span>${label}</span><p>${esc(text)}</p></div>` : "";
+// Items for a .metaline; each is wrapped so flex layout keeps its inner spacing.
+const metaline = items => items.length ? `<div class="metaline">${items.map(x => `<span>${x}</span>`).join("<i>·</i>")}</div>` : "";
+const extLink = url => url ? `<a class="ext" href="${esc(href(url))}" target="_blank" rel="noopener">${esc(host(href(url)))} ↗</a>` : "";
+// A person's link: an email opens your mail app, anything else opens in a new tab.
+const personLink = l => !l ? "" : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l) ? `<a class="ext" href="mailto:${esc(l)}">${esc(l)}</a>` : extLink(l);
+const checkbox = (name, on, label) => `<label class="check"><input type="checkbox" name="${name}" ${on ? "checked" : ""}>${label}</label>`;
+const formButtons = () => `<div class="eform-f">
+  <button type="button" class="btn small" data-act="cancel-edit">Cancel</button>
+  <button type="submit" class="btn small primary">Save <kbd>Ctrl+Enter</kbd></button></div>`;
+
+function companyView(c) {
+  const meta = [extLink(c.website), c.remote && REMOTE[c.remote], c.is_big_tech && "Big tech", c.urgent && `<b class="flag">★ Urgent</b>`].filter(Boolean);
+  const body = ro("What they do", c.about) + ro("References", c.refs) + ro("Notes", c.notes);
+  return metaline(meta) +
+    (body || `<p class="empty-note">Nothing saved yet. Use Edit to add what they do, references and notes; they show on the brief.</p>`);
+}
+
+function companyForm(c) {
+  return `<form class="eform" data-edit="company" autocomplete="off">
+    ${fld("Name", `<input type="text" name="name" value="${esc(c.name)}" required>`)}
+    <div class="grid2">
+      ${fld("Website", `<input type="text" name="website" value="${esc(c.website)}" placeholder="company.com">`)}
+      ${fld("Remote", `<select name="remote">${Object.entries(REMOTE).map(([v, l]) => `<option value="${v}" ${v === c.remote ? "selected" : ""}>${v ? l : "Not sure"}</option>`).join("")}</select>`)}
     </div>
-    ${fld("Tools", inp(t, id, "tools", a.tools, { ph: "Python, AWS, Figma" }))}
-    ${fld("Responsibilities", area(t, id, "responsibilities", a.responsibilities, "What the role involves", 2))}
-    ${fld("Comments", area(t, id, "comments", a.comments, "", 1))}
-    <div class="card-f"><span>Added ${fmtDate(a.created_at.slice(0, 10))}</span><button class="btn small ghost danger" data-act="del-app" data-id="${id}">Delete application</button></div>
+    <div class="checks">${checkbox("is_big_tech", c.is_big_tech, "Big tech")}${checkbox("urgent", c.urgent, "★ Urgent: apply soon")}</div>
+    ${fld("What they do", `<textarea name="about" rows="2" placeholder="Products, customers, size, anything worth remembering. Shows on the brief.">${esc(c.about)}</textarea>`)}
+    ${fld("References", `<textarea name="refs" rows="1" placeholder="Who referred you, who you know there">${esc(c.refs)}</textarea>`)}
+    ${fld("Notes", `<textarea name="notes" rows="2" placeholder="Anything else">${esc(c.notes)}</textarea>`)}
+    ${formButtons()}
+  </form>`;
+}
+
+function appCard(a, highlight) {
+  const meta = [
+    a.date_applied ? `Applied ${fmtDate(a.date_applied)} <span class="muted">(${ago(daysSince(a.date_applied))})</span>` : "Not applied yet",
+    a.offer && `Offer: <b>${esc(a.offer)}</b>`,
+    a.joining_date && `Joining ${fmtDate(a.joining_date, { weekday: true })}`,
+    extLink(a.job_url),
+  ].filter(Boolean);
+  return `<div class="card app ${highlight ? "hl" : ""}" data-app="${a.id}">
+    <div class="card-h"><h4>${esc(a.position || "Untitled role")}</h4>${statusSelect(a)}</div>
+    ${metaline(meta)}
+    ${splitTools(a.tools).length ? `<div class="tools">${toolChips(a.tools)}</div>` : ""}
+    ${ro("Responsibilities", a.responsibilities)}${ro("Comments", a.comments)}
+    <div class="card-a"><button class="btn small ghost" data-act="edit" data-edit="app:${a.id}">Edit</button><button class="btn small ghost danger" data-act="del-app" data-id="${a.id}">Delete</button></div>
   </div>`;
 }
 
-function personRow(p) {
-  const t = "contacts", id = p.id;
-  return `<div class="person"><div>
-      <div class="grid3">${inp(t, id, "name", p.name, { ph: "Name" })}${inp(t, id, "role", p.role, { ph: "Role, e.g. Hiring manager" })}${inp(t, id, "link", p.link, { ph: "LinkedIn or email" })}</div>
-      ${area(t, id, "notes", p.notes, "What to remember about them", 1)}
-    </div><button class="btn small ghost" data-act="del-person" data-id="${id}" title="Remove">✕</button></div>`;
+function appForm(a) {
+  const v = a || { position: "", job_url: "", status: S.data.config.statuses[0] || "", date_applied: S.data.today, offer: "", joining_date: "", tools: "", responsibilities: "", comments: "" };
+  return `<form class="eform" data-edit="${a ? `app:${a.id}` : "app:new"}" autocomplete="off">
+    <div class="grid2">
+      ${fld("Position", `<input type="text" name="position" value="${esc(v.position)}" placeholder="e.g. Backend Engineer">`)}
+      ${fld("Status", `<select name="status">${statusOptions(v.status)}</select>`)}
+    </div>
+    ${fld("Job post", `<input type="url" name="job_url" value="${esc(v.job_url)}" placeholder="https://…">`)}
+    <div class="grid3">
+      ${fld("Date applied", `<input type="date" name="date_applied" value="${esc(v.date_applied)}">`)}
+      ${fld("Offer", `<input type="text" name="offer" value="${esc(v.offer)}" placeholder="Salary, terms">`)}
+      ${fld("Joining date", `<input type="date" name="joining_date" value="${esc(v.joining_date)}">`)}
+    </div>
+    ${fld("Tools", `<input type="text" name="tools" value="${esc(v.tools)}" placeholder="Python, AWS, Figma">`)}
+    ${fld("Responsibilities", `<textarea name="responsibilities" rows="2" placeholder="What the role involves">${esc(v.responsibilities)}</textarea>`)}
+    ${fld("Comments", `<textarea name="comments" rows="1">${esc(v.comments)}</textarea>`)}
+    ${formButtons()}
+  </form>`;
+}
+
+function personCard(p) {
+  return `<div class="pcard">
+    <div class="pcard-h"><b>${esc(p.name || "Unnamed")}</b>
+      <span class="pcard-a"><button class="btn small ghost" data-act="edit" data-edit="person:${p.id}">Edit</button><button class="btn small ghost danger" data-act="del-person" data-id="${p.id}">Delete</button></span></div>
+    ${p.role ? `<div class="muted">${esc(p.role)}</div>` : ""}
+    ${p.link ? `<div>${personLink(p.link)}</div>` : ""}
+    ${p.notes ? `<p>${esc(p.notes)}</p>` : ""}
+  </div>`;
+}
+
+function personForm(p) {
+  const v = p || { name: "", role: "", link: "", notes: "" };
+  return `<form class="eform person-form" data-edit="${p ? `person:${p.id}` : "person:new"}" autocomplete="off">
+    <div class="grid3">
+      ${fld("Name *", `<input type="text" name="name" value="${esc(v.name)}" required>`)}
+      ${fld("Role", `<input type="text" name="role" value="${esc(v.role)}" placeholder="e.g. Hiring manager">`)}
+      ${fld("Link", `<input type="text" name="link" value="${esc(v.link)}" placeholder="LinkedIn or email">`)}
+    </div>
+    ${fld("Notes", `<textarea name="notes" rows="2" placeholder="What to remember about them">${esc(v.notes)}</textarea>`)}
+    ${formButtons()}
+  </form>`;
+}
+
+// Keep what's typed into an open form when the panel redraws (e.g. after a status change).
+function editDraft() {
+  const f = $("#drawer .eform");
+  return f ? { key: f.dataset.edit, values: [...f.elements].filter(el => el.name).map(el => [el.name, el.type === "checkbox" ? el.checked : el.value]) } : null;
+}
+function restoreEditDraft(d) {
+  const f = $("#drawer .eform");
+  for (const [name, value] of d.values) {
+    const el = f?.elements[name];
+    if (el) el.type === "checkbox" ? (el.checked = value) : (el.value = value);
+  }
+}
+
+function openEdit(key) {
+  S.open.edit = key;
+  renderDrawer(true);
+  const f = $("#drawer .eform");
+  f?.scrollIntoView({ block: "nearest" });
+  $("input:not([type=checkbox]), textarea", f)?.focus();
+}
+function cancelEdit() {
+  S.open.edit = null;
+  renderDrawer(true);
+}
+
+async function saveEdit(form) {
+  const [kind, id] = form.dataset.edit.split(":"), cid = S.open.cid;
+  const data = Object.fromEntries([...form.elements].filter(el => el.name).map(el => [el.name, el.type === "checkbox" ? el.checked : el.value]));
+  if ((kind === "person" || kind === "company") && !data.name.trim()) {
+    form.elements.name.focus();
+    return toast(kind === "person" ? "A person needs a name" : "A company needs a name", "error");
+  }
+  const table = { company: "companies", app: "applications", person: "contacts" }[kind];
+  try {
+    const row = kind === "company" ? await api("PATCH", `/api/companies/${cid}`, data)
+      : id === "new" ? await api("POST", `/api/${table}`, { ...data, company_id: cid })
+      : await api("PATCH", `/api/${table}/${id}`, data);
+    S.open.edit = null;
+    if (kind === "app") S.open.appId = row.id;
+    await reload(); renderMain(); renderDrawer(true);
+    toast("Saved");
+  } catch (err) { toast(err.message, "error"); }
 }
 
 function logForm(apps, appId) {
@@ -1241,26 +1363,6 @@ function autosize(ta) {
   requestAnimationFrame(fit);
 }
 
-async function saveField(el) {
-  const t = el.dataset.t, id = +el.dataset.id, f = el.dataset.f;
-  const value = el.type === "checkbox" ? el.checked : el.value;
-  const current = findRow(t, id)?.[f];
-  if (current === value || (current ?? "") === value) return;
-  clearTimeout(el._timer);
-  try {
-    const row = await api("PATCH", `/api/${t}/${id}`, { [f]: value });
-    replaceRow(t, row);
-    el.classList.remove("bad");
-    if (f === "tools" && el.value !== row.tools && document.activeElement !== el) el.value = row.tools;
-    el.classList.add("saved");
-    setTimeout(() => el.classList.remove("saved"), 700);
-    renderMain();
-  } catch (err) {
-    el.classList.add("bad");
-    toast(err.message, "error");
-  }
-}
-
 async function addLog() {
   const body = $("#log-body").value.trim();
   const date = $("#log-date").value, time = $("#log-time").value;
@@ -1296,28 +1398,18 @@ async function drawerAction(act, el) {
     switch (act) {
       case "close": return closeDrawer();
       case "brief": return openBrief(cid, S.open.appId);
-      case "add-app": {
-        const row = await api("POST", "/api/applications", { company_id: cid, status: S.data.config.statuses[0] || "", date_applied: S.data.today });
-        S.open.appId = row.id;
-        await refresh();
-        const card = $(`.card[data-app="${row.id}"]`);
-        card?.scrollIntoView({ block: "center" });
-        $("input[data-f=position]", card)?.focus();
-        return;
-      }
+      case "edit": return openEdit(el.dataset.edit);
+      case "cancel-edit": return cancelEdit();
       case "del-app":
         if (!confirm("Delete this application? Its log entries stay with the company.")) return;
         await api("DELETE", `/api/applications/${el.dataset.id}`);
         return refresh();
-      case "add-person": {
-        const row = await api("POST", "/api/contacts", { company_id: cid });
-        await refresh();
-        $(`input[data-t=contacts][data-id="${row.id}"][data-f=name]`)?.focus();
-        return;
-      }
-      case "del-person":
+      case "del-person": {
+        const person = findRow("contacts", +el.dataset.id);
+        if (!confirm(`Remove ${person?.name || "this person"}?`)) return;
         await api("DELETE", `/api/contacts/${el.dataset.id}`);
         return refresh();
+      }
       case "add-log": return addLog();
       case "edit-ev": return editEvent(+el.dataset.id);
       case "cancel-ev": return renderDrawer(true);
@@ -1614,9 +1706,9 @@ function showShortcuts() {
   const m = openModal(`<h2>Keyboard shortcuts</h2><div class="shortcuts">
     <kbd>n</kbd><span>New application (a company on the Companies tab, an event on the Calendar)</span><kbd>/</kbd><span>Search</span>
     <kbd>j</kbd> <kbd>k</kbd><span>Move down / up the list</span><kbd>Enter</kbd><span>Open the selected row</span>
-    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd>–<kbd>4</kbd><span>Applications / Companies / Calendar / Dashboard</span>
+    <kbd>b</kbd><span>Brief image for the open company</span><kbd>1</kbd>–<kbd>4</kbd><span>Dashboard / Applications / Companies / Calendar</span>
     <kbd>←</kbd> <kbd>→</kbd><span>Previous / next month on the Calendar</span>
-    <kbd>Ctrl+Enter</kbd><span>Save the form, or add the log entry</span><kbd>Esc</kbd><span>Close / leave a field</span>
+    <kbd>Ctrl+Enter</kbd><span>Save the form, or add the log entry</span><kbd>Esc</kbd><span>Leave a field, cancel an edit, close</span>
   </div><div class="actions"><button class="btn" data-close>Close</button></div>`);
   $("[data-close]", m).onclick = closeModal;
 }
@@ -1929,16 +2021,13 @@ function wire() {
   document.addEventListener("change", e => {
     const el = e.target;
     if (el.dataset.status) return setStatus(+el.dataset.status, el.value);
-    if (el.dataset.t) saveField(el);
   });
 
   const drawer = $("#drawer");
-  drawer.addEventListener("input", e => {
-    const el = e.target;
-    if (el.tagName === "TEXTAREA" && el.dataset.t) {
-      clearTimeout(el._timer);
-      el._timer = setTimeout(() => saveField(el), 1000);   // notes save as you type
-    }
+  drawer.addEventListener("submit", e => {
+    if (!e.target.matches(".eform")) return;
+    e.preventDefault();
+    saveEdit(e.target);
   });
   drawer.addEventListener("click", e => {
     const tpl = e.target.closest("[data-tpl]");
@@ -1949,6 +2038,8 @@ function wire() {
   drawer.addEventListener("keydown", e => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       if (e.target.id === "log-body" || e.target.closest(".logform")) { e.preventDefault(); addLog(); }
+      const form = e.target.closest(".eform");
+      if (form) { e.preventDefault(); form.requestSubmit(); }
       const ev = e.target.closest(".ev[data-ev]");
       if (ev) { e.preventDefault(); drawerAction("save-ev", { dataset: { id: ev.dataset.ev } }); }
     }
@@ -1977,6 +2068,7 @@ function wire() {
     if (e.key === "Escape") {
       if (modalEl) { closeModal(); e.preventDefault(); }
       else if (typing) t.blur();
+      else if (S.open?.edit) cancelEdit();
       else if (S.open) closeDrawer();
       else if (S.q || S.filters.size || S.status) { S.q = ""; $("#search").value = ""; S.filters.clear(); S.status = null; renderMain(); }
       return;
@@ -1989,24 +2081,18 @@ function wire() {
       k: () => moveSel(-1), ArrowUp: () => moveSel(-1),
       Enter: () => S.sel >= 0 && openRow(S.sel),
       b: () => S.open && openBrief(S.open.cid, S.open.appId),
-      1: () => setView("applications"),
-      2: () => setView("companies"),
-      3: () => setView("calendar"),
-      4: () => setView("dashboard"),
+      1: () => setView("dashboard"),
+      2: () => setView("applications"),
+      3: () => setView("companies"),
+      4: () => setView("calendar"),
       ...(S.view === "calendar" ? { ArrowLeft: () => shiftMonth(-1), ArrowRight: () => shiftMonth(1) } : {}),
       "?": () => showShortcuts(),
     };
     if (keys[e.key]) { e.preventDefault(); keys[e.key](); }
   });
 
-  // Save a note that's mid-edit if the tab is closed.
-  window.addEventListener("beforeunload", () => {
-    const el = document.activeElement;
-    if (el?.dataset?.t) {
-      const value = el.type === "checkbox" ? el.checked : el.value;
-      fetch(`/api/${el.dataset.t}/${el.dataset.id}`, { method: "PATCH", keepalive: true, headers: { "X-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ [el.dataset.f]: value }) });
-    }
-  });
+  // Warn before closing the tab with an unsaved form open in the company panel.
+  window.addEventListener("beforeunload", e => { if (S.open?.edit) e.preventDefault(); });
 }
 
 (async function start() {

@@ -82,7 +82,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "event_date": "date", "event_time": "time",
     },
     "contacts": {
-        "company_id": "ref", "name": "text", "role": "text", "link": "text", "notes": "text",
+        "company_id": "ref", "name": "person", "role": "text", "link": "text", "notes": "text",
     },
 }
 TABLES = tuple(FIELDS)
@@ -132,6 +132,10 @@ def _coerce(kind: str, key: str, value):
     if kind == "name":
         if not text:
             raise ValidationError("A company needs a name")
+        return text
+    if kind == "person":
+        if not text:
+            raise ValidationError("A person needs a name")
         return text
     if kind == "remote":
         text = text.lower()
@@ -215,6 +219,8 @@ def insert(conn: sqlite3.Connection, table: str, data: dict) -> dict:
     values = clean(table, data)
     if table == "companies" and "name" not in values:
         raise ValidationError("A company needs a name")
+    if table == "contacts" and "name" not in values:
+        raise ValidationError("A person needs a name")
     if table != "companies" and "company_id" not in values:
         raise ValidationError("company_id is required")
     if table == "events":

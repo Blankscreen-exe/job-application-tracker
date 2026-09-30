@@ -135,6 +135,13 @@ class DbTests(unittest.TestCase):
         self.assertEqual((ev["kind"], ev["event_date"], ev["event_time"]), ("onboarding", "2026-04-22", "22:00"))
         with self.assertRaises(db.ValidationError):
             db.insert(conn, "events", {"company_id": cid, "kind": "party"})
+        for bad in ({"company_id": cid}, {"company_id": cid, "name": "  "}):
+            with self.assertRaises(db.ValidationError):
+                db.insert(conn, "contacts", bad)
+        person = db.insert(conn, "contacts", {"company_id": cid, "name": "Sam", "role": "Recruiter"})
+        with self.assertRaises(db.ValidationError):
+            db.update(conn, "contacts", person["id"], {"name": ""})
+        self.assertEqual(db.update(conn, "contacts", person["id"], {"notes": "Friendly"})["name"], "Sam")
 
     def test_exports(self):
         conn = memory_db()
