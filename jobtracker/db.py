@@ -1,5 +1,6 @@
 """SQLite storage: companies, their applications, the people you talk to and a log of events,
-plus a little about you (your profile and portfolio projects) for writing messages.
+plus a little about you (your profile and portfolio projects) for writing messages, and the resume
+versions you send (the files themselves live in a folder; see resumes.py).
 
 Functions here never commit; callers wrap their work in `with conn:` so a request is all-or-nothing.
 """
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS applications (
     responsibilities TEXT NOT NULL DEFAULT '',
     comments         TEXT NOT NULL DEFAULT '',
     told             TEXT NOT NULL DEFAULT '[]',
+    resume_id        INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL
 );
@@ -91,11 +93,21 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS resumes (
+    id         INTEGER PRIMARY KEY,
+    filename   TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    label      TEXT NOT NULL DEFAULT '',
+    notes      TEXT NOT NULL DEFAULT '',
+    is_default INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 # Columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them to an old database.
 ADDED_COLUMNS = {
-    "applications": {"told": "TEXT NOT NULL DEFAULT '[]'"},
+    "applications": {"told": "TEXT NOT NULL DEFAULT '[]'",
+                     "resume_id": "INTEGER REFERENCES resumes(id) ON DELETE SET NULL"},
     "events": {"remind": "INTEGER NOT NULL DEFAULT 0"},
 }
 
@@ -108,7 +120,7 @@ FIELDS: dict[str, dict[str, str]] = {
     "applications": {
         "company_id": "ref", "position": "text", "job_url": "text", "tools": "tools",
         "date_applied": "date", "status": "text", "offer": "text", "joining_date": "date",
-        "responsibilities": "text", "comments": "text", "told": "pairs",
+        "responsibilities": "text", "comments": "text", "told": "pairs", "resume_id": "optref",
     },
     "events": {
         "company_id": "ref", "application_id": "optref", "kind": "kind", "body": "text",
@@ -124,6 +136,8 @@ FIELDS: dict[str, dict[str, str]] = {
         "name": "project", "description": "text", "tools": "tools", "repo_url": "text", "demo_url": "text",
         "role": "text", "dates": "text", "results": "text",
     },
+    # The filename is set when a file is found or uploaded (resumes.py), never edited here.
+    "resumes": {"label": "text", "notes": "text", "is_default": "bool"},
 }
 TABLES = tuple(FIELDS)
 # Tables whose rows belong to a company.
@@ -282,7 +296,7 @@ def _integrity(exc: sqlite3.IntegrityError) -> ValidationError:
     if "UNIQUE" in msg:
         return ValidationError("A company with that name already exists")
     if "FOREIGN KEY" in msg:
-        return ValidationError("That company or application no longer exists")
+        return ValidationError("That company, application or resume no longer exists")
     return ValidationError(msg)
 
 
@@ -303,6 +317,8 @@ def get(conn: sqlite3.Connection, table: str, row_id: int) -> dict | None:
 def insert(conn: sqlite3.Connection, table: str, data: dict) -> dict:
     if table == "profile":
         raise ValidationError("There is only one profile; update it instead")
+    if table == "resumes":
+        raise ValidationError("Upload a resume file instead")
     values = clean(table, data)
     for key, kind in FIELDS[table].items():
         if kind in REQUIRED and key not in values:
@@ -332,6 +348,8 @@ def update(conn: sqlite3.Connection, table: str, row_id: int, data: dict) -> dic
         return old
     if table == "events":
         _check_event_link(conn, values, old)
+    if table == "resumes" and values.get("is_default"):
+        conn.execute("UPDATE resumes SET is_default = 0 WHERE id != ?", (row_id,))
     values["updated_at"] = now()
     sets = ", ".join(f"{key} = ?" for key in values)
     try:

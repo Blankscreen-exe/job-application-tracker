@@ -21,7 +21,12 @@ It runs in your browser, keeps everything in one file on your computer, and need
   Click a day to add an event (company, which application, what, date and time), or an event to edit it.
 - **Reminders.** Tick "Set reminder" on an event (interviews are ticked by default) and it shows in
   *Coming up*, the company panel and the dashboard's next 7 days. Unticked events stay on the calendar and in the log.
-- **What I told them.** Label/value rows on each application, such as the resume version you sent or the
+- **Resumes.** Keep each version (say a Node.js resume and a Python resume) as a file in `resumes/`. On the
+  Me tab, upload or drop files, give each a label and notes, pick a default, view one, show it in its folder or
+  open the folder. **Copy file** puts the resume on the clipboard: paste it into an upload box, an email or a
+  chat, or paste into a file picker's *File name* box (it holds the full path too) and press Enter. Each application has a *Resume sent* picker (the default is preselected for new ones), and
+  it shows on the card, the brief and in email prompts. Deleting a resume moves its file to `resumes/removed/`.
+- **What I told them.** Label/value rows on each application, such as the notice period or the
   salary you quoted, so you stay consistent. They show on the card, the brief and in email prompts.
 - **Write email.** Builds a prompt with everything the tracker knows (the role, company, people, history,
   what you told them, your About me and projects) to paste into ChatGPT, Claude or any LLM: a follow-up,
@@ -95,6 +100,9 @@ Everything lives in the `data/` folder inside the project, which git ignores:
 
 To back up or move your data, copy that folder. Set `JOBTRACKER_HOME` to keep the data somewhere else,
 for example a synced folder.
+
+Resume files live in `resumes/` inside the project, also ignored by git. Any PDF, Word, ODT, RTF, TXT or
+Markdown file you put there shows up in the app; set `JOBTRACKER_RESUMES` to use another folder.
 
 ## Settings
 

@@ -372,6 +372,12 @@ select.st option { color: var(--ink); background: var(--bg); }
 .pcard .tools { margin-top: 8px; }
 .pcard .plinks { display: flex; gap: 14px; margin-top: 8px; }
 .pcard .plinks .ext, .me .metaline .ext { margin-left: 0; }
+.resumes.drop { outline: 2px dashed var(--accent); outline-offset: 6px; }
+.rcard.missing { border-style: dashed; }
+.rcard .file { font-size: 13px; color: var(--muted); }
+.rcard .warn { color: var(--accent); font-weight: 700; font-size: 13px; }
+.rcard .plinks button { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; }
+.rcard .plinks button:hover { color: var(--accent); }
 
 /* prompts */
 .prompt-out { font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; background: var(--hover); padding: 10px 12px; border: 0; }
@@ -487,6 +493,7 @@ select.st option { color: var(--ink); background: var(--bg); }
 <aside id="drawer" class="drawer" hidden></aside>
 <input type="file" id="file-import" accept=".csv,text/csv" hidden>
 <input type="file" id="file-projects" accept=".csv,text/csv" hidden>
+<input type="file" id="file-resume" accept=".pdf,.docx,.doc,.odt,.rtf,.txt,.md" multiple hidden>
 <datalist id="co-list"></datalist>
 <datalist id="told-labels"></datalist>
 <div id="toast"></div>
@@ -648,6 +655,21 @@ const statusSelect = (a, extra = "") =>
 const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 const href = url => /^https?:\/\//i.test(url) ? url : "https://" + url;
 
+// Resumes: a label if you gave one, else the file name. Missing files still show by name.
+const sortedResumes = () => S.data.resumes.slice().sort((a, b) => b.is_default - a.is_default || (a.label || a.filename).localeCompare(b.label || b.filename));
+const resumeName = id => { const r = id && findRow("resumes", id); return r ? r.label || r.filename : ""; };
+const resumeUrl = id => `/resume/${id}?t=${encodeURIComponent(TOKEN)}`;
+const resumeLink = id => { const r = findRow("resumes", id); return !r ? "" : r.missing ? esc(resumeName(id)) : `<a class="ext" href="${resumeUrl(id)}" target="_blank" rel="noopener">${esc(resumeName(id))} ↗</a>`; };
+const defaultResumeId = () => S.data.resumes.find(r => r.is_default && !r.missing)?.id ?? null;
+const fmtSize = n => n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+// The "Resume sent" picker; nothing at all until you have a resume.
+function resumeField(current) {
+  if (!S.data.resumes.length) return "";
+  const opts = sortedResumes().filter(r => !r.missing || r.id === current)
+    .map(r => `<option value="${r.id}" ${r.id === current ? "selected" : ""}>${esc(r.label || r.filename)}</option>`).join("");
+  return fld("Resume sent", `<select name="resume_id"><option value="">None</option>${opts}</select>`);
+}
+
 // ---------- main view --------------------------------------------------------------------------
 
 const FILTERS = {
@@ -700,7 +722,7 @@ function haystack(c, a) {
   const people = (S.peopleBy.get(c.id) || []).map(p => `${p.name} ${p.role} ${p.notes}`);
   const parts = [c.name, c.website, c.about, c.notes, c.refs, ...people];
   const apps = a ? [a] : coApps(c.id);
-  for (const x of apps) parts.push(x.position, x.tools, x.status, x.comments, x.responsibilities, x.offer, ...x.told.map(r => `${r.label} ${r.value}`));
+  for (const x of apps) parts.push(x.position, x.tools, x.status, x.comments, x.responsibilities, x.offer, ...x.told.map(r => `${r.label} ${r.value}`), resumeName(x.resume_id));
   return parts.join(" ").toLowerCase();
 }
 
@@ -1261,6 +1283,7 @@ function appCard(a, highlight) {
     a.date_applied ? `Applied ${fmtDate(a.date_applied)} <span class="muted">(${ago(daysSince(a.date_applied))})</span>` : "Not applied yet",
     a.offer && `Offer: <b>${esc(a.offer)}</b>`,
     a.joining_date && `Joining ${fmtDate(a.joining_date, { weekday: true })}`,
+    a.resume_id && `Resume: ${resumeLink(a.resume_id)}`,
     extLink(a.job_url),
   ].filter(Boolean);
   return `<div class="card app ${highlight ? "hl" : ""}" data-app="${a.id}">
@@ -1274,7 +1297,7 @@ function appCard(a, highlight) {
 }
 
 function appForm(a) {
-  const v = a || { position: "", job_url: "", status: S.data.config.statuses[0] || "", date_applied: S.data.today, offer: "", joining_date: "", tools: "", responsibilities: "", comments: "", told: [] };
+  const v = a || { position: "", job_url: "", status: S.data.config.statuses[0] || "", date_applied: S.data.today, offer: "", joining_date: "", tools: "", responsibilities: "", comments: "", told: [], resume_id: defaultResumeId() };
   return `<form class="eform" data-edit="${a ? `app:${a.id}` : "app:new"}" autocomplete="off">
     <div class="grid2">
       ${fld("Position", `<input type="text" name="position" value="${esc(v.position)}" placeholder="e.g. Backend Engineer">`)}
@@ -1287,9 +1310,10 @@ function appForm(a) {
       ${fld("Joining date", `<input type="date" name="joining_date" value="${esc(v.joining_date)}">`)}
     </div>
     ${fld("Tools", `<input type="text" name="tools" value="${esc(v.tools)}" placeholder="Python, AWS, Figma">`)}
+    ${resumeField(v.resume_id)}
     ${fld("Responsibilities", `<textarea name="responsibilities" rows="2" placeholder="What the role involves">${esc(v.responsibilities)}</textarea>`)}
     ${fld("Comments", `<textarea name="comments" rows="1">${esc(v.comments)}</textarea>`)}
-    <div class="fld"><span>What I told them <span class="muted">(resume version, salary, notice period, anything)</span></span>
+    <div class="fld"><span>What I told them <span class="muted">(salary, notice period, anything)</span></span>
       <div class="told-rows">${(v.told?.length ? v.told : [{ label: "", value: "" }]).map(toldRow).join("")}</div>
       <button type="button" class="btn small ghost told-add" data-act="told-add">+ Add row</button></div>
     ${formButtons()}
@@ -1647,6 +1671,7 @@ function openQuickAdd(prefill = {}) {
       ${fld("Website", `<input type="text" name="website" placeholder="company.com" data-co>`)}
       ${fld("Tools", `<input type="text" name="tools" placeholder="Comma separated: Python, AWS, Figma">`)}
       <div class="popular" id="qa-tools"></div>
+      ${resumeField(defaultResumeId())}
       <div class="checks">
         <label class="check"><input type="checkbox" name="is_big_tech" data-co> Big tech</label>
         <label class="check"><input type="checkbox" name="urgent" data-co> ★ Urgent</label>
@@ -1713,7 +1738,7 @@ function openQuickAdd(prefill = {}) {
     if (!confirmNotDuplicate(F.job_url.value)) return;
     const payload = {
       company: { name: F.name.value, website: F.website.value, remote: F.remote.value, is_big_tech: F.is_big_tech.checked, urgent: F.urgent.checked },
-      application: { position: F.position.value, job_url: F.job_url.value, tools: F.tools.value, date_applied: F.date_applied.value, status: F.status.value, comments: F.comments.value },
+      application: { position: F.position.value, job_url: F.job_url.value, tools: F.tools.value, date_applied: F.date_applied.value, status: F.status.value, comments: F.comments.value, resume_id: F.resume_id?.value || null },
     };
     try {
       const out = await api("POST", "/api/quick-add", payload);
@@ -2056,6 +2081,7 @@ function drawBrief(canvas, cid, appId) {
       app.job_url && T(host(app.job_url), { size: 15, weight: 700, color: C.red, gap: 8 }),
       app.offer && T(`Offer: ${app.offer}`, { size: 16, weight: 700, gap: 12 }),
       app.joining_date && T(`Joining ${fmtDate(app.joining_date, { year: true })}`, { size: 15 }),
+      app.resume_id && T(`Resume sent: ${resumeName(app.resume_id)}`, { size: 15, gap: 8 }),
     ])]);
     if (app.told.length) left.push(["What I told them", stack(app.told.map((r, i) => T(r.label ? `${r.label}: ${r.value}` : r.value, { size: 15, max: 3, gap: i ? 6 : 0 })))]);
     const tl = splitTools(app.tools);
@@ -2109,9 +2135,9 @@ function drawBrief(canvas, cid, appId) {
   canvas.getContext("2d").drawImage(tmp, 0, 0, W * SCALE, H * SCALE, 0, 0, W * SCALE, H * SCALE);
 }
 
-// ---------- me: about me and portfolio projects ------------------------------------------------
+// ---------- me: about me, portfolio projects and resumes ---------------------------------------
 
-// S.meEdit says which part of the Me page is a form: "profile", "project:<id>" or "project:new".
+// S.meEdit says which part of the Me page is a form: "profile", "project:<id>", "project:new" or "resume:<id>".
 function renderMe() {
   const p = S.data.profile[0], edit = S.meEdit;
   const projects = S.data.projects.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -2131,7 +2157,8 @@ function renderMe() {
       ${edit === "project:new" ? projectForm(null) : ""}
       ${projects.length ? `<div class="projects">${projects.map(pr => edit === `project:${pr.id}` ? projectForm(pr) : projectCard(pr)).join("")}</div>`
         : edit === "project:new" ? "" : `<p class="empty-note">Add the projects you'd point people to; they go into every message and email prompt. Or import a CSV with columns like Name, Description, Tools, Repo, Demo, Role, Dates, Results.</p>`}
-    </section>`;
+    </section>
+    ${resumesSection()}`;
   $$("#me textarea").forEach(autosize);
 }
 
@@ -2199,6 +2226,56 @@ function projectForm(pr) {
   </form>`;
 }
 
+function resumesSection() {
+  const list = sortedResumes(), edit = S.meEdit;
+  return `<section class="sec resumes">
+      <div class="sech"><h3>Resumes (${list.length})</h3><span class="sech-a">
+        <button class="btn small" data-me="open-folder" title="${esc(S.data.resumes_dir)}">Open folder</button>
+        <button class="btn small" data-me="upload">+ Upload</button></span></div>
+      ${list.length ? `<div class="projects">${list.map(r => edit === `resume:${r.id}` ? resumeForm(r) : resumeCard(r)).join("")}</div>`
+        : `<p class="empty-note">Keep one file per version, like a Node.js resume and a Python resume. Upload them here, drop them on this section, or put them in the resumes folder (Open folder). PDF, Word, ODT, RTF, TXT or Markdown.</p>`}
+    </section>`;
+}
+
+function resumeCard(r) {
+  const used = S.data.applications.filter(a => a.resume_id === r.id).length;
+  const facts = r.missing ? [] : [fmtSize(r.size), r.modified && `changed ${fmtDate(r.modified.slice(0, 10))}`, used && `sent with ${plural(used, "application")}`].filter(Boolean);
+  return `<div class="pcard rcard ${r.missing ? "missing" : ""}">
+    <div class="pcard-h"><b>${esc(r.label || r.filename)}${r.is_default ? `<span class="tag">DEFAULT</span>` : ""}</b>
+      <span class="pcard-a"><button class="btn small ghost" data-me="edit" data-edit="resume:${r.id}">Edit</button><button class="btn small ghost danger" data-me="del-resume" data-id="${r.id}">Delete</button></span></div>
+    ${r.label ? `<div class="file">${esc(r.filename)}</div>` : ""}
+    ${facts.length ? `<div class="muted">${esc(facts.join(" · "))}</div>` : ""}
+    ${r.missing ? `<div class="warn">Not in the resumes folder any more${used ? `; ${plural(used, "application")} still point to it` : ""}.</div>` : ""}
+    ${r.notes ? `<p>${esc(r.notes)}</p>` : ""}
+    ${r.missing ? "" : `<div class="plinks"><a class="ext" href="${resumeUrl(r.id)}" target="_blank" rel="noopener">View ↗</a><button data-me="copy-resume" data-id="${r.id}" title="Paste it into an upload box, an email or a chat, or into a file picker's File name box">Copy file</button><button data-me="reveal" data-id="${r.id}">Show in folder</button></div>`}
+  </div>`;
+}
+
+function resumeForm(r) {
+  return `<form class="eform" data-edit="resume:${r.id}" autocomplete="off">
+    <div class="muted" style="font-size:13px;margin-bottom:8px">${esc(r.filename)}</div>
+    ${fld("Label", `<input type="text" name="label" value="${esc(r.label)}" placeholder="e.g. Node.js backend">`)}
+    ${fld("Notes", `<textarea name="notes" rows="2" placeholder="What this version is for, what it highlights">${esc(r.notes)}</textarea>`)}
+    <div class="checks">${checkbox("is_default", r.is_default, " Default for new applications")}</div>
+    ${formButtons()}
+  </form>`;
+}
+
+async function uploadResumes(files) {
+  const added = [];
+  for (const file of files) {
+    try {
+      const res = await fetch(`/api/resumes/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      added.push(data.filename);
+    } catch (err) { toast(`${file.name}: ${err.message}`, "error"); }
+  }
+  if (!added.length) return;
+  await reload(); renderMain();
+  toast(added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} resumes`);
+}
+
 function openMeEdit(key) {
   S.meEdit = key;
   renderMe();
@@ -2212,6 +2289,7 @@ async function saveMe(form) {
   if (kind === "project" && !data.name.trim()) { form.elements.name.focus(); return toast("A project needs a name", "error"); }
   try {
     if (kind === "profile") await api("PATCH", "/api/profile/1", data);
+    else if (kind === "resume") await api("PATCH", `/api/resumes/${id}`, data);
     else if (id === "new") await api("POST", "/api/projects", data);
     else await api("PATCH", `/api/projects/${id}`, data);
     S.meEdit = null;
@@ -2232,6 +2310,21 @@ async function meAction(act, el) {
         await api("DELETE", `/api/projects/${pr.id}`);
         await reload(); renderMain();
         return toast(`Deleted ${pr.name}`);
+      }
+      case "upload": return $("#file-resume").click();
+      case "open-folder": return await api("POST", "/api/resumes/open-folder");
+      case "reveal": return await api("POST", `/api/resumes/${el.dataset.id}/reveal`);
+      case "copy-resume": {
+        await api("POST", `/api/resumes/${el.dataset.id}/copy`);
+        return toast(`Copied ${resumeName(+el.dataset.id)}. Paste it into an upload box, or into a file picker's File name box`);
+      }
+      case "del-resume": {
+        const r = findRow("resumes", +el.dataset.id), used = S.data.applications.filter(a => a.resume_id === r.id).length;
+        const note = r.missing ? "" : " The file is moved to resumes/removed, not erased.";
+        if (!confirm(`Delete ${r.label || r.filename}?${note}${used ? ` ${plural(used, "application")} will no longer show which resume was sent.` : ""}`)) return;
+        await api("DELETE", `/api/resumes/${r.id}`);
+        await reload(); renderMain();
+        return toast(`Deleted ${r.label || r.filename}`);
       }
     }
   } catch (err) { toast(err.message, "error"); }
@@ -2300,7 +2393,8 @@ function jobBlock(a) {
       a.date_applied && `Applied: ${fmtDate(a.date_applied, { year: true })} (${ago(daysSince(a.date_applied))})`,
       a.job_url && `Job post: ${a.job_url}`, a.tools && `Tools they want: ${a.tools}`,
       a.responsibilities && `Responsibilities: ${oneLine(a.responsibilities)}`, a.offer && `Offer: ${a.offer}`,
-      a.joining_date && `Joining date: ${fmtDate(a.joining_date, { year: true })}`, a.comments && `My comments: ${oneLine(a.comments)}`].filter(Boolean).join("\n")),
+      a.joining_date && `Joining date: ${fmtDate(a.joining_date, { year: true })}`, a.resume_id && `Resume I sent: ${resumeName(a.resume_id)}`,
+      a.comments && `My comments: ${oneLine(a.comments)}`].filter(Boolean).join("\n")),
     section("What I've already told them (stay consistent with this)", a.told.map(r => `- ${r.label ? r.label + ": " : ""}${r.value}`).join("\n")),
     section("People there", people.map(p => `- ${p.name}${p.role ? ` (${p.role})` : ""}${p.link ? `, ${p.link}` : ""}${p.notes ? `: ${oneLine(p.notes)}` : ""}`).join("\n")),
     section("History so far (oldest first)", history.join("\n")),
@@ -2576,6 +2670,20 @@ function wire() {
     const file = e.target.files[0];
     e.target.value = "";
     if (file) importProjects(file);
+  });
+  $("#file-resume").addEventListener("change", e => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (files.length) uploadResumes(files);
+  });
+  // Drop resume files on the Resumes section to upload them.
+  const dropZone = e => e.dataTransfer?.types.includes("Files") && e.target.closest?.("#me .resumes");
+  mePage.addEventListener("dragover", e => { const z = dropZone(e); if (z) { e.preventDefault(); z.classList.add("drop"); } });
+  mePage.addEventListener("dragleave", e => { const z = e.target.closest?.("#me .resumes"); if (z && !z.contains(e.relatedTarget)) z.classList.remove("drop"); });
+  mePage.addEventListener("drop", e => {
+    const z = dropZone(e); if (!z) return;
+    e.preventDefault(); z.classList.remove("drop");
+    uploadResumes([...e.dataTransfer.files]);
   });
 
   $("#file-import").addEventListener("change", e => {

@@ -10,7 +10,7 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
-from jobtracker import config, db, exporter, importer, server
+from jobtracker import config, db, exporter, importer, resumes, server
 
 STATUSES = config.DEFAULTS["statuses"]
 
@@ -171,6 +171,7 @@ class ProfileAndProjectTests(unittest.TestCase):
             old = sqlite3.connect(path)
             old.executescript(db.SCHEMA.split("CREATE TABLE IF NOT EXISTS profile")[0]
                               .replace("    told             TEXT NOT NULL DEFAULT '[]',\n", "")
+                              .replace("    resume_id        INTEGER REFERENCES resumes(id) ON DELETE SET NULL,\n", "")
                               .replace("    remind         INTEGER NOT NULL DEFAULT 0,\n", ""))
             old.execute("INSERT INTO companies (name, created_at, updated_at) VALUES ('A', 'x', 'x')")
             old.execute("INSERT INTO events (company_id, kind, event_date, created_at, updated_at) VALUES (1, 'interview', '2030-01-01', 'x', 'x')")
@@ -178,6 +179,9 @@ class ProfileAndProjectTests(unittest.TestCase):
             old.close()
             conn = db.connect(path, init=True)
             self.assertFalse(db.all_rows(conn, "events")[0]["remind"])  # existing events start without a reminder
+            with conn:
+                cid = db.insert(conn, "companies", {"name": "B"})["id"]
+                self.assertIsNone(db.insert(conn, "applications", {"company_id": cid})["resume_id"])
             self.assertEqual(len(db.all_rows(conn, "profile")), 1)
             self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], db.SCHEMA_VERSION)
             db.connect(path, init=True).close()  # running it again is harmless
@@ -232,13 +236,69 @@ class ProfileAndProjectTests(unittest.TestCase):
             importer.import_projects(conn, "Foo,Bar\n1,2\n")
 
 
+class ResumeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.folder = Path(self.tmp.name)
+        self.conn = memory_db()
+
+    def tearDown(self):
+        self.conn.close()
+        self.tmp.cleanup()
+
+    def test_folder_sync_and_default(self):
+        (self.folder / "node.pdf").write_bytes(b"%PDF node")
+        (self.folder / "notes.xlsx").write_bytes(b"not a resume")
+        (self.folder / "~$python.docx").write_bytes(b"word lock file")
+        resumes.sync(self.conn, self.folder)
+        resumes.sync(self.conn, self.folder)  # nothing new the second time
+        (self.folder / "python.docx").write_bytes(b"docx")
+        resumes.sync(self.conn, self.folder)
+        rows = resumes.listing(self.conn, self.folder)
+        self.assertEqual([(r["filename"], r["is_default"]) for r in rows], [("node.pdf", True), ("python.docx", False)])
+        db.update(self.conn, "resumes", rows[1]["id"], {"is_default": True, "label": "Python"})
+        self.assertEqual([r["is_default"] for r in db.all_rows(self.conn, "resumes")], [False, True])
+        (self.folder / "node.pdf").unlink()
+        self.assertTrue(resumes.listing(self.conn, self.folder)[0]["missing"])
+        with self.assertRaises(db.ValidationError):
+            db.insert(self.conn, "resumes", {"label": "no file"})
+
+    def test_upload_names(self):
+        self.assertEqual(resumes.safe_name(r'..\x/My: CV.PDF'), "My_ CV.pdf")
+        with self.assertRaises(db.ValidationError):
+            resumes.safe_name("evil.exe")
+        first = resumes.upload(self.conn, self.folder, "cv.pdf", b"one")
+        second = resumes.upload(self.conn, self.folder, "CV.pdf", b"two")
+        self.assertEqual((first["filename"], second["filename"]), ("cv.pdf", "CV (2).pdf"))
+        self.assertEqual((self.folder / "CV (2).pdf").read_bytes(), b"two")
+        with self.assertRaises(db.ValidationError):
+            resumes.upload(self.conn, self.folder, "empty.pdf", b"")
+
+    def test_remove_moves_file_and_unlinks_applications(self):
+        a = resumes.upload(self.conn, self.folder, "a.pdf", b"a")
+        b = resumes.upload(self.conn, self.folder, "b.pdf", b"b")
+        cid = db.insert(self.conn, "companies", {"name": "Acme"})["id"]
+        app = db.insert(self.conn, "applications", {"company_id": cid, "resume_id": a["id"]})
+        self.assertEqual(app["resume_id"], a["id"])
+        resumes.remove(self.conn, self.folder, a["id"])
+        self.assertTrue((self.folder / "removed" / "a.pdf").exists())
+        self.assertIsNone(db.get(self.conn, "applications", app["id"])["resume_id"])
+        self.assertTrue(db.get(self.conn, "resumes", b["id"])["is_default"])  # the default moves on
+        resumes.sync(self.conn, self.folder)
+        self.assertEqual([r["filename"] for r in db.all_rows(self.conn, "resumes")], ["b.pdf"])
+        with self.assertRaises(db.ValidationError):
+            db.update(self.conn, "applications", app["id"], {"resume_id": 999})
+
+
 class ServerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         path = Path(cls.tmp.name) / "jobs.sqlite3"
         db.connect(path, init=True).close()
-        cls.srv = server.TrackerServer(("127.0.0.1", 0), path, dict(config.DEFAULTS))
+        cls.resumes = Path(cls.tmp.name) / "resumes"
+        cls.resumes.mkdir()
+        cls.srv = server.TrackerServer(("127.0.0.1", 0), path, dict(config.DEFAULTS), cls.resumes)
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
         cls.base = cls.srv.url.rstrip("/")
 
@@ -284,6 +344,31 @@ class ServerTests(unittest.TestCase):
         self.call("DELETE", f"/api/companies/{out['company_id']}")
         data = self.call("GET", "/api/data")
         self.assertEqual((data["companies"], data["applications"], data["events"]), ([], [], []))
+
+    def test_resumes(self):
+        req = urllib.request.Request(self.base + "/api/resumes/upload?name=Node%20CV.pdf", method="POST", data=b"%PDF-1.4 node",
+                                     headers={"X-Token": self.srv.token})
+        with urllib.request.urlopen(req) as res:
+            row = json.loads(res.read())
+        self.assertTrue((self.resumes / "Node CV.pdf").exists())
+        (self.resumes / "python.docx").write_bytes(b"docx")
+        data = self.call("GET", "/api/data")
+        self.assertEqual(sorted(r["filename"] for r in data["resumes"]), ["Node CV.pdf", "python.docx"])
+        self.assertEqual(data["resumes_dir"], str(self.resumes))
+        with urllib.request.urlopen(f"{self.base}/resume/{row['id']}?t={self.srv.token}") as res:
+            self.assertEqual((res.read(), res.headers["Content-Type"]), (b"%PDF-1.4 node", "application/pdf"))
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(f"{self.base}/resume/{row['id']}")
+        self.assertEqual(ctx.exception.code, 403)
+        self.assertEqual(self.call("PATCH", f"/api/resumes/{row['id']}", {"label": "Node.js"})["label"], "Node.js")
+        out = self.call("POST", "/api/quick-add", {"company": {"name": "Resume Co"}, "application": {"position": "Dev", "resume_id": row["id"]}})
+        self.assertEqual(self.call("GET", "/api/data")["applications"][-1]["resume_id"], row["id"])
+        self.call("DELETE", f"/api/resumes/{row['id']}")
+        self.assertTrue((self.resumes / "removed" / "Node CV.pdf").exists())
+        data = self.call("GET", "/api/data")
+        self.assertEqual([r["filename"] for r in data["resumes"]], ["python.docx"])
+        self.assertIsNone(data["applications"][-1]["resume_id"])
+        self.call("DELETE", f"/api/companies/{out['company_id']}")
 
     def test_bad_host_rejected(self):
         req = urllib.request.Request(self.base + "/", headers={"Host": "evil.example"})

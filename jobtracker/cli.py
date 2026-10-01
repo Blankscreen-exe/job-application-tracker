@@ -72,6 +72,7 @@ def cmd_where(args, cfg) -> int:
     print(f"database:    {paths.db_path()}")
     print(f"config:      {paths.config_path()}")
     print(f"backups:     {paths.backup_dir()}")
+    print(f"resumes:     {paths.resumes_dir()}")
     return 0
 
 

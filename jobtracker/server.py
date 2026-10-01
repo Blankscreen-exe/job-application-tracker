@@ -16,9 +16,9 @@ import webbrowser
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
-from . import db, exporter, importer
+from . import db, exporter, importer, paths, resumes
 
 PAGE = Path(__file__).resolve().parent / "static" / "index.html"
 MAX_BODY = 20 * 1024 * 1024
@@ -28,10 +28,11 @@ PORT_ATTEMPTS = 20
 class TrackerServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address, db_file: Path, cfg: dict):
+    def __init__(self, address, db_file: Path, cfg: dict, resumes_dir: Path | None = None):
         super().__init__(address, Handler)
         self.db_file = db_file
         self.cfg = cfg
+        self.resumes_dir = resumes_dir or paths.resumes_dir()
         self.token = secrets.token_urlsafe(24)
 
     @property
@@ -139,13 +140,25 @@ class Handler(BaseHTTPRequestHandler):
             filename = f"job-tracker-{stem}-{date.today().isoformat()}.{ext}"
             return self._send(200, body, f"{ctype}; charset=utf-8",
                               {"Content-Disposition": f'attachment; filename="{filename}"'})
+        if parts[0] == "resume" and len(parts) == 2 and parts[1].isdigit() and method == "GET":
+            path = resumes.path_of(conn, self.server.resumes_dir, int(parts[1]))
+            disposition = f"inline; filename*=UTF-8''{quote(path.name)}"
+            return self._send(200, path.read_bytes(), resumes.content_type(path), {"Content-Disposition": disposition})
         if parts[0] != "api" or len(parts) < 2:
             raise db.NotFound("/".join(parts))
         name = parts[1]
 
         if name == "data" and method == "GET":
+            folder = self.server.resumes_dir
+            with conn:
+                resumes.sync(conn, folder)
             return self._json(200, {"config": self.server.cfg, "today": date.today().isoformat(),
-                                    **db.all_data(conn)})
+                                    **db.all_data(conn), "resumes": resumes.listing(conn, folder),
+                                    "resumes_dir": str(folder)})
+        if name == "resumes":
+            done = self._resume_route(conn, method, parts[2:], query)
+            if done:
+                return None
         if name == "quick-add" and method == "POST":
             body = self._json_body()
             with conn:
@@ -179,6 +192,28 @@ class Handler(BaseHTTPRequestHandler):
                         db.delete(conn, name, row_id)
                     return self._json(200, {"ok": True})
         raise db.NotFound("/".join(parts))
+
+    def _resume_route(self, conn: sqlite3.Connection, method: str, rest: list[str], query: dict) -> bool:
+        """Resume calls that touch the folder. Label, notes and default go through the generic PATCH."""
+        folder = self.server.resumes_dir
+        if rest == ["upload"] and method == "POST":
+            with conn:
+                row = resumes.upload(conn, folder, (query.get("name") or [""])[0], self._body())
+            self._json(200, row)
+        elif rest == ["open-folder"] and method == "POST":
+            resumes.open_folder(folder)
+            self._json(200, {"ok": True})
+        elif len(rest) == 2 and rest[0].isdigit() and rest[1] in ("reveal", "copy") and method == "POST":
+            path = resumes.path_of(conn, folder, int(rest[0]))
+            (resumes.reveal if rest[1] == "reveal" else resumes.copy_to_clipboard)(path)
+            self._json(200, {"ok": True})
+        elif len(rest) == 1 and rest[0].isdigit() and method == "DELETE":
+            with conn:
+                resumes.remove(conn, folder, int(rest[0]))
+            self._json(200, {"ok": True})
+        else:
+            return False
+        return True
 
 
 def serve(db_file: Path, cfg: dict, *, port: int | None = None, open_browser: bool = True) -> None:
