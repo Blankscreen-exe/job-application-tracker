@@ -372,7 +372,14 @@ select.st option { color: var(--ink); background: var(--bg); }
 .pcard .tools { margin-top: 8px; }
 .pcard .plinks { display: flex; gap: 14px; margin-top: 8px; }
 .pcard .plinks .ext, .me .metaline .ext { margin-left: 0; }
-.resumes.drop { outline: 2px dashed var(--accent); outline-offset: 6px; }
+.dropbox {
+  display: block; width: 100%; margin-bottom: 12px; padding: 18px 14px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--rule); background: none; color: var(--muted);
+}
+.dropbox b { color: var(--ink); }
+.dropbox:hover, .dropbox:focus-visible { border-color: var(--ink); outline: none; }
+.resumes.drop .dropbox { border-color: var(--accent); background: var(--hover); color: var(--ink); }
+.dropbox.busy { cursor: progress; border-color: var(--ink); }
 .rcard.missing { border-style: dashed; }
 .rcard .file { font-size: 13px; color: var(--muted); }
 .rcard .warn { color: var(--accent); font-weight: 700; font-size: 13px; }
@@ -2230,10 +2237,10 @@ function resumesSection() {
   const list = sortedResumes(), edit = S.meEdit;
   return `<section class="sec resumes">
       <div class="sech"><h3>Resumes (${list.length})</h3><span class="sech-a">
-        <button class="btn small" data-me="open-folder" title="${esc(S.data.resumes_dir)}">Open folder</button>
-        <button class="btn small" data-me="upload">+ Upload</button></span></div>
+        <button class="btn small" data-me="open-folder" title="${esc(S.data.resumes_dir)}">Open folder</button></span></div>
+      <button type="button" class="dropbox" data-me="upload"><b>Drop resumes here</b>, or click to choose · PDF, Word, ODT, RTF, TXT, Markdown</button>
       ${list.length ? `<div class="projects">${list.map(r => edit === `resume:${r.id}` ? resumeForm(r) : resumeCard(r)).join("")}</div>`
-        : `<p class="empty-note">Keep one file per version, like a Node.js resume and a Python resume. Upload them here, drop them on this section, or put them in the resumes folder (Open folder). PDF, Word, ODT, RTF, TXT or Markdown.</p>`}
+        : `<p class="empty-note">Keep one file per version, like a Node.js resume and a Python resume. Files you put in the resumes folder (Open folder) show up here too.</p>`}
     </section>`;
 }
 
@@ -2262,8 +2269,10 @@ function resumeForm(r) {
 }
 
 async function uploadResumes(files) {
-  const added = [];
-  for (const file of files) {
+  const added = [], box = $("#me .dropbox");
+  box?.classList.add("busy");
+  for (const [i, file] of files.entries()) {
+    if (box) box.textContent = `Uploading ${files.length > 1 ? `${i + 1} of ${files.length}: ` : ""}${file.name}…`;
     try {
       const res = await fetch(`/api/resumes/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
       const data = await res.json().catch(() => ({}));
@@ -2271,7 +2280,7 @@ async function uploadResumes(files) {
       added.push(data.filename);
     } catch (err) { toast(`${file.name}: ${err.message}`, "error"); }
   }
-  if (!added.length) return;
+  if (!added.length) return renderMe();
   await reload(); renderMain();
   toast(added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} resumes`);
 }
@@ -2676,13 +2685,23 @@ function wire() {
     e.target.value = "";
     if (files.length) uploadResumes(files);
   });
-  // Drop resume files on the Resumes section to upload them.
-  const dropZone = e => e.dataTransfer?.types.includes("Files") && e.target.closest?.("#me .resumes");
-  mePage.addEventListener("dragover", e => { const z = dropZone(e); if (z) { e.preventDefault(); z.classList.add("drop"); } });
-  mePage.addEventListener("dragleave", e => { const z = e.target.closest?.("#me .resumes"); if (z && !z.contains(e.relatedTarget)) z.classList.remove("drop"); });
-  mePage.addEventListener("drop", e => {
+  // Drop resume files on the Resumes section (its drop box lights up) to upload them. Files dropped anywhere
+  // else are ignored, so a missed drop doesn't open the file in the browser and leave the tracker.
+  const hasFiles = e => e.dataTransfer?.types.includes("Files");
+  const dropZone = e => hasFiles(e) && e.target.closest?.("#me .resumes");
+  document.addEventListener("dragover", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const z = dropZone(e);
+    e.dataTransfer.dropEffect = z ? "copy" : "none";
+    z?.classList.add("drop");
+  });
+  document.addEventListener("dragleave", e => { const z = e.target.closest?.("#me .resumes"); if (z && !z.contains(e.relatedTarget)) z.classList.remove("drop"); });
+  document.addEventListener("drop", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
     const z = dropZone(e); if (!z) return;
-    e.preventDefault(); z.classList.remove("drop");
+    z.classList.remove("drop");
     uploadResumes([...e.dataTransfer.files]);
   });
 
