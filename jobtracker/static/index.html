@@ -372,6 +372,9 @@ select.st option { color: var(--ink); background: var(--bg); }
 .pcard .tools { margin-top: 8px; }
 .pcard .plinks { display: flex; gap: 14px; margin-top: 8px; }
 .pcard .plinks .ext, .me .metaline .ext { margin-left: 0; }
+.details { display: grid; grid-template-columns: max-content minmax(0, max-content) auto; justify-content: start; gap: 4px 14px; align-items: center; }
+.details > span { overflow-wrap: anywhere; }
+.details .copied { color: var(--accent); }
 .dropbox {
   display: block; width: 100%; margin-bottom: 12px; padding: 18px 14px; text-align: center; cursor: pointer;
   border: 2px dashed var(--rule); background: none; color: var(--muted);
@@ -435,7 +438,7 @@ select.st option { color: var(--ink); background: var(--bg); }
   .cev b, .cev span { display: none; }
   .cal-agenda { display: block; margin-top: 18px; }
   .told-row { grid-template-columns: 1fr auto; }
-  .told-row [name=told_value] { grid-column: 1; }
+  .told-row [name=told_value], .told-row [name=detail_value] { grid-column: 1; }
   .me-head h2 { font-size: 26px; }
 }
 @media (max-width: 720px) {
@@ -1360,13 +1363,14 @@ function personForm(p) {
   </form>`;
 }
 
-// A form's named fields as an object; label/value rows become a `told` list.
+// A form's named fields as an object; label/value rows become a `told` or `details` list.
 function formData(form) {
   const data = {};
   for (const el of form.elements) {
-    if (el.name && !el.name.startsWith("told_")) data[el.name] = el.type === "checkbox" ? el.checked : el.value;
+    if (el.name && !/^(told|detail)_/.test(el.name)) data[el.name] = el.type === "checkbox" ? el.checked : el.value;
   }
   if ($(".told-rows", form)) data.told = toldRows(form);
+  if ($(".detail-rows", form)) data.details = detailRows(form);
   return data;
 }
 
@@ -2158,6 +2162,10 @@ function renderMe() {
       ${edit === "profile" ? profileForm(p) : profileView(p)}
     </section>
     <section class="sec">
+      <div class="sech"><h3>Form details</h3>${edit === "details" ? "" : `<button class="btn small" data-me="edit" data-edit="details">Edit</button>`}</div>
+      ${edit === "details" ? detailsForm(p) : detailsView(p)}
+    </section>
+    <section class="sec">
       <div class="sech"><h3>Projects (${projects.length})</h3><span class="sech-a">
         <button class="btn small" data-me="import" title="Columns like Name, Description, Tools, Repo, Demo, Role, Dates, Results">Import CSV</button>
         <button class="btn small" data-me="edit" data-edit="project:new">+ Add project</button></span></div>
@@ -2198,6 +2206,46 @@ function profileForm(p) {
     ${fld("Links <span class=\"muted\">(one per line)</span>", `<textarea name="links" rows="3" placeholder="linkedin.com/in/me&#10;github.com/me&#10;me@mail.com">${esc(p.links)}</textarea>`)}
     ${formButtons()}
   </form>`;
+}
+
+// Form details: label/value pairs (First name, Postcode...) to copy into job application forms.
+const DETAIL_STARTERS = ["First name", "Last name", "Email", "Phone", "Postcode", "LinkedIn"];
+
+function detailsView(p) {
+  if (!p.details.length) return `<p class="empty-note">Your name, email, phone, postcode and anything else job forms keep asking for, each with a Copy button.</p>`;
+  return `<div class="details">${p.details.map((r, i) => `<b>${esc(r.label)}</b>` + (r.value
+    ? `<span>${esc(r.value)}</span><button class="btn small ghost" data-me="copy-detail" data-i="${i}" title="Copy ${esc(r.label)}">Copy</button>`
+    : `<span class="muted">—</span><span></span>`)).join("")}</div>`;
+}
+
+function detailsForm(p) {
+  const rows = p.details.length ? p.details : DETAIL_STARTERS.map(label => ({ label, value: "" }));
+  return `<form class="eform" data-edit="details" autocomplete="off">
+    <div class="detail-rows">${rows.map(detailRow).join("")}</div>
+    <button type="button" class="btn small ghost told-add" data-me="detail-add">+ Add another field</button>
+    ${formButtons()}
+  </form>`;
+}
+
+const detailRow = r => `<div class="told-row">
+  <input type="text" name="detail_label" value="${esc(r.label)}" placeholder="Field, e.g. Postcode">
+  <input type="text" name="detail_value" value="${esc(r.value)}" placeholder="Your answer">
+  <button type="button" class="btn small ghost" data-me="detail-del" title="Remove field">✕</button></div>`;
+// The detail rows of a form; a row without a label is dropped.
+const detailRows = form => $$(".detail-rows .told-row", form)
+  .map(row => ({ label: $("[name=detail_label]", row).value.trim(), value: $("[name=detail_value]", row).value.trim() }))
+  .filter(r => r.label);
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.append(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
 }
 
 function projectCard(pr) {
@@ -2290,14 +2338,14 @@ function openMeEdit(key) {
   renderMe();
   const f = $("#me .eform");
   f?.scrollIntoView({ block: "nearest" });
-  $("input, textarea", f)?.focus();
+  ($("[name=detail_value]", f) || $("input, textarea", f))?.focus();
 }
 
 async function saveMe(form) {
   const [kind, id] = form.dataset.edit.split(":"), data = formData(form);
   if (kind === "project" && !data.name.trim()) { form.elements.name.focus(); return toast("A project needs a name", "error"); }
   try {
-    if (kind === "profile") await api("PATCH", "/api/profile/1", data);
+    if (kind === "profile" || kind === "details") await api("PATCH", "/api/profile/1", data);
     else if (kind === "resume") await api("PATCH", `/api/resumes/${id}`, data);
     else if (id === "new") await api("POST", "/api/projects", data);
     else await api("PATCH", `/api/projects/${id}`, data);
@@ -2311,6 +2359,25 @@ async function meAction(act, el) {
   try {
     switch (act) {
       case "edit": return openMeEdit(el.dataset.edit);
+      case "detail-add": {
+        const rows = $("#me .detail-rows");
+        rows.insertAdjacentHTML("beforeend", detailRow({ label: "", value: "" }));
+        return rows.lastElementChild.querySelector("input").focus();
+      }
+      case "detail-del": {
+        const rows = el.closest(".detail-rows");
+        el.closest(".told-row").remove();
+        if (!rows.children.length) rows.innerHTML = detailRow({ label: "", value: "" });
+        return;
+      }
+      case "copy-detail": {
+        await copyText(S.data.profile[0].details[+el.dataset.i].value);
+        el.textContent = "Copied ✓";
+        el.classList.add("copied");
+        clearTimeout(el.copyTimer);
+        el.copyTimer = setTimeout(() => { el.textContent = "Copy"; el.classList.remove("copied"); }, 1500);
+        return;
+      }
       case "message": return openPitchPrompt();
       case "import": return $("#file-projects").click();
       case "del-project": {

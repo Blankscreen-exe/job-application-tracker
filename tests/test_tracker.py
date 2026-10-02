@@ -207,6 +207,27 @@ class ProfileAndProjectTests(unittest.TestCase):
         self.assertEqual(cell, "Salary: will discuss; Resume: v3")
         self.assertEqual(importer.parse_told(cell), app["told"])
 
+    def test_profile_details(self):
+        conn = memory_db()
+        self.assertEqual(db.all_rows(conn, "profile")[0]["details"], [])
+        rows = [{"label": " First name ", "value": "Ali"}, {"label": "", "value": ""}, ["Postcode", "SW1A 1AA"]]
+        self.assertEqual(db.update(conn, "profile", 1, {"details": rows})["details"],
+                         [{"label": "First name", "value": "Ali"}, {"label": "Postcode", "value": "SW1A 1AA"}])
+        with self.assertRaisesRegex(db.ValidationError, "details"):
+            db.update(conn, "profile", 1, {"details": "not json"})
+
+    def test_old_profile_gets_details(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "old.sqlite3"
+            old = sqlite3.connect(path)
+            old.executescript(db.SCHEMA.replace("    details    TEXT NOT NULL DEFAULT '[]',\n", ""))
+            old.execute("INSERT INTO profile (id, name, created_at, updated_at) VALUES (1, 'Me', 'x', 'x')")
+            old.commit()
+            old.close()
+            conn = db.connect(path, init=True)
+            self.assertEqual(db.all_rows(conn, "profile")[0]["details"], [])
+            conn.close()
+
     def test_profile_is_single(self):
         conn = memory_db()
         self.assertEqual(db.update(conn, "profile", 1, {"name": "Me", "skills": "Go, go, SQL"})["skills"], "Go, SQL")
