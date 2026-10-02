@@ -3,6 +3,10 @@ a note and which one is the default.
 
 The folder is the source of truth. Drop a file in and it shows up; upload one from the app and it is
 written there. Deleting from the app moves the file to removed/ inside the folder rather than erasing it.
+
+Each version can have its own subfolder, so every file can carry the name you send it under:
+python/Ali Khan - Resume.pdf and nodejs/Ali Khan - Resume.pdf. A resume's filename is its path inside the
+folder, with "/" between the subfolder and the file.
 """
 
 from __future__ import annotations
@@ -24,18 +28,31 @@ REMOVED = "removed"
 UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def files(folder: Path) -> list[Path]:
-    """Resume files directly inside the folder (not in removed/ or other subfolders)."""
-    return sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in EXTENSIONS
-                  and not p.name.startswith(("~$", ".")))
+def _is_resume(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() in EXTENSIONS and not path.name.startswith(("~$", "."))
+
+
+def _rel(sub: str, name: str) -> str:
+    return f"{sub}/{name}" if sub else name
+
+
+def files(folder: Path) -> list[str]:
+    """Resume files in the folder and in its version subfolders (not removed/), as paths inside it."""
+    out = []
+    for path in folder.iterdir():
+        if path.is_dir() and path.name.lower() != REMOVED and not path.name.startswith("."):
+            out += [_rel(path.name, p.name) for p in path.iterdir() if _is_resume(p)]
+        elif _is_resume(path):
+            out.append(path.name)
+    return sorted(out, key=str.lower)
 
 
 def sync(conn: sqlite3.Connection, folder: Path) -> None:
     """Add a row for every file in the folder that the tracker hasn't seen yet."""
     known = {r["filename"].lower() for r in conn.execute("SELECT filename FROM resumes")}
-    for path in files(folder):
-        if path.name.lower() not in known:
-            _insert(conn, path.name)
+    for rel in files(folder):
+        if rel.lower() not in known:
+            _insert(conn, rel)
 
 
 def _insert(conn: sqlite3.Connection, filename: str) -> dict:
@@ -66,24 +83,67 @@ def safe_name(name: str) -> str:
     return (stem.strip() or "resume") + ext.lower()
 
 
-def _free(folder: Path, name: str) -> Path:
-    """folder/name, or folder/'name (2).ext' and so on if that is taken."""
-    path, stem, ext, n = folder / name, Path(name).stem, Path(name).suffix, 2
-    while path.exists():
-        path, n = folder / f"{stem} ({n}){ext}", n + 1
-    return path
+def safe_folder(name: str) -> str:
+    """A version subfolder name ("python"); blank means the resumes folder itself."""
+    name = UNSAFE.sub("_", name or "").strip(" .")
+    if name.lower() == REMOVED:
+        raise db.ValidationError(f"{REMOVED} is where deleted resumes go; pick another folder name")
+    return name
 
 
-def upload(conn: sqlite3.Connection, folder: Path, name: str, data: bytes) -> dict:
+def _taken(conn: sqlite3.Connection | None, folder: Path, rel: str) -> bool:
+    """Whether a file has that name (ignoring case, as Windows and macOS do) or a resume row has that path."""
+    parent, name = (folder / rel).parent, Path(rel).name.lower()
+    if parent.is_dir() and any(p.name.lower() == name for p in parent.iterdir()):
+        return True
+    return conn is not None and conn.execute("SELECT 1 FROM resumes WHERE filename = ?", (rel,)).fetchone() is not None
+
+
+def _free(conn: sqlite3.Connection | None, folder: Path, sub: str, name: str) -> str:
+    """sub/name, or sub/'name (2).ext' and so on if that is taken."""
+    stem, ext, n, cand = Path(name).stem, Path(name).suffix, 2, name
+    while _taken(conn, folder, _rel(sub, cand)):
+        cand, n = f"{stem} ({n}){ext}", n + 1
+    return _rel(sub, cand)
+
+
+def upload(conn: sqlite3.Connection, folder: Path, name: str, data: bytes, subfolder: str = "") -> dict:
     if not data:
         raise db.ValidationError("That file is empty")
-    path = _free(folder, safe_name(name))
+    sub = safe_folder(subfolder)
+    rel = _free(conn, folder, sub, safe_name(name))
+    path = folder / rel
+    path.parent.mkdir(exist_ok=True)
     path.write_bytes(data)
     try:
-        return _insert(conn, path.name)
+        return _insert(conn, rel)
     except Exception:
         path.unlink(missing_ok=True)
         raise
+
+
+def move(conn: sqlite3.Connection, folder: Path, row_id: int, subfolder: str, name: str) -> dict:
+    """Put a resume's file in another subfolder and/or rename it, keeping its extension. The row stays the
+    same, so applications that were sent it still point to it."""
+    old = path_of(conn, folder, row_id)
+    current = db.get(conn, "resumes", row_id)["filename"]  # type: ignore[index]
+    stem = UNSAFE.sub("_", name or "").strip(" .")
+    if stem.lower().endswith(old.suffix.lower()):
+        stem = stem[: -len(old.suffix)].rstrip(" .")
+    if not stem:
+        raise db.ValidationError("A resume needs a file name")
+    rel = _rel(safe_folder(subfolder), stem + old.suffix.lower())
+    if rel == current:
+        return db.get(conn, "resumes", row_id)  # type: ignore[return-value]
+    if rel.lower() != current.lower() and _taken(conn, folder, rel):
+        raise db.ValidationError(f"There is already a {rel}")
+    new = folder / rel
+    new.parent.mkdir(exist_ok=True)
+    old.rename(new)
+    if old.parent != folder and not any(old.parent.iterdir()):
+        old.parent.rmdir()  # the subfolder it left is empty now
+    conn.execute("UPDATE resumes SET filename = ?, updated_at = ? WHERE id = ?", (rel, db.now(), row_id))
+    return db.get(conn, "resumes", row_id)  # type: ignore[return-value]
 
 
 def path_of(conn: sqlite3.Connection, folder: Path, row_id: int) -> Path:
@@ -103,9 +163,8 @@ def remove(conn: sqlite3.Connection, folder: Path, row_id: int) -> None:
         raise db.NotFound(f"resume {row_id}")
     path = folder / row["filename"]
     if path.is_file():
-        bin_dir = folder / REMOVED
-        bin_dir.mkdir(exist_ok=True)
-        shutil.move(str(path), str(_free(bin_dir, path.name)))
+        (folder / REMOVED).mkdir(exist_ok=True)
+        shutil.move(str(path), str(folder / _free(None, folder, REMOVED, path.name)))
     db.delete(conn, "resumes", row_id)
     if row["is_default"]:
         conn.execute("UPDATE resumes SET is_default = 1 WHERE id = (SELECT MIN(id) FROM resumes)")

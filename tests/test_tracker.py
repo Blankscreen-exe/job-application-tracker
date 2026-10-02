@@ -295,6 +295,38 @@ class ResumeTests(unittest.TestCase):
         with self.assertRaises(db.ValidationError):
             resumes.upload(self.conn, self.folder, "empty.pdf", b"")
 
+    def test_version_folders(self):
+        (self.folder / "python").mkdir()
+        (self.folder / "python" / "Ali Khan - Resume.pdf").write_bytes(b"py")
+        (self.folder / "removed").mkdir()
+        (self.folder / "removed" / "old.pdf").write_bytes(b"old")
+        resumes.sync(self.conn, self.folder)
+        node = resumes.upload(self.conn, self.folder, "Ali Khan - Resume.pdf", b"node", "nodejs")
+        self.assertEqual(sorted(r["filename"] for r in resumes.listing(self.conn, self.folder)),
+                         ["nodejs/Ali Khan - Resume.pdf", "python/Ali Khan - Resume.pdf"])
+        self.assertEqual((self.folder / "nodejs" / "Ali Khan - Resume.pdf").read_bytes(), b"node")
+        with self.assertRaises(db.ValidationError):
+            resumes.upload(self.conn, self.folder, "x.pdf", b"x", "Removed")
+
+        # Moving a file into a folder and renaming it keeps the row, so applications still point to it.
+        loose = resumes.upload(self.conn, self.folder, "resume_go_v3_FINAL.pdf", b"go")
+        cid = db.insert(self.conn, "companies", {"name": "A"})["id"]
+        app = db.insert(self.conn, "applications", {"company_id": cid, "resume_id": loose["id"]})
+        moved = resumes.move(self.conn, self.folder, loose["id"], "go", "Ali Khan - Resume.pdf")
+        self.assertEqual(moved["filename"], "go/Ali Khan - Resume.pdf")
+        self.assertEqual(db.get(self.conn, "applications", app["id"])["resume_id"], loose["id"])
+        self.assertFalse((self.folder / "resume_go_v3_FINAL.pdf").exists())
+        self.assertEqual((self.folder / "go" / "Ali Khan - Resume.pdf").read_bytes(), b"go")
+        with self.assertRaises(db.ValidationError):  # the python folder already has that name
+            resumes.move(self.conn, self.folder, node["id"], "python", "ali khan - resume")
+        with self.assertRaises(db.ValidationError):
+            resumes.move(self.conn, self.folder, node["id"], "nodejs", "  ")
+        # Moving the last file out of a folder removes the empty folder.
+        resumes.move(self.conn, self.folder, node["id"], "node", "Ali Khan - Resume")
+        self.assertFalse((self.folder / "nodejs").exists())
+        resumes.sync(self.conn, self.folder)
+        self.assertEqual(len(db.all_rows(self.conn, "resumes")), 3)
+
     def test_remove_moves_file_and_unlinks_applications(self):
         a = resumes.upload(self.conn, self.folder, "a.pdf", b"a")
         b = resumes.upload(self.conn, self.folder, "b.pdf", b"b")
@@ -381,13 +413,21 @@ class ServerTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(f"{self.base}/resume/{row['id']}")
         self.assertEqual(ctx.exception.code, 403)
+        moved = self.call("POST", f"/api/resumes/{row['id']}/move", {"folder": "node", "name": "Ali Khan - Resume"})
+        self.assertEqual(moved["filename"], "node/Ali Khan - Resume.pdf")
+        with urllib.request.urlopen(f"{self.base}/resume/{row['id']}?t={self.srv.token}") as res:
+            self.assertEqual(res.read(), b"%PDF-1.4 node")
+        req = urllib.request.Request(self.base + "/api/resumes/upload?name=Ali%20Khan%20-%20Resume.docx&folder=python",
+                                     method="POST", data=b"docx2", headers={"X-Token": self.srv.token})
+        with urllib.request.urlopen(req) as res:
+            self.assertEqual(json.loads(res.read())["filename"], "python/Ali Khan - Resume.docx")
         self.assertEqual(self.call("PATCH", f"/api/resumes/{row['id']}", {"label": "Node.js"})["label"], "Node.js")
         out = self.call("POST", "/api/quick-add", {"company": {"name": "Resume Co"}, "application": {"position": "Dev", "resume_id": row["id"]}})
         self.assertEqual(self.call("GET", "/api/data")["applications"][-1]["resume_id"], row["id"])
         self.call("DELETE", f"/api/resumes/{row['id']}")
-        self.assertTrue((self.resumes / "removed" / "Node CV.pdf").exists())
+        self.assertTrue((self.resumes / "removed" / "Ali Khan - Resume.pdf").exists())
         data = self.call("GET", "/api/data")
-        self.assertEqual([r["filename"] for r in data["resumes"]], ["python.docx"])
+        self.assertEqual(sorted(r["filename"] for r in data["resumes"]), ["python.docx", "python/Ali Khan - Resume.docx"])
         self.assertIsNone(data["applications"][-1]["resume_id"])
         self.call("DELETE", f"/api/companies/{out['company_id']}")
 

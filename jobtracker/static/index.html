@@ -384,6 +384,8 @@ select.st option { color: var(--ink); background: var(--bg); }
 .resumes.drop .dropbox { border-color: var(--accent); background: var(--hover); color: var(--ink); }
 .dropbox.busy { cursor: progress; border-color: var(--ink); }
 .rcard.missing { border-style: dashed; }
+.rup-row { margin-bottom: 8px; }
+.rup-row .file { font-weight: 700; margin-bottom: 4px; }
 .rcard .file { font-size: 13px; color: var(--muted); }
 .rcard .warn { color: var(--accent); font-weight: 700; font-size: 13px; }
 .rcard .plinks button { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; }
@@ -666,8 +668,14 @@ const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); 
 const href = url => /^https?:\/\//i.test(url) ? url : "https://" + url;
 
 // Resumes: a label if you gave one, else the file name. Missing files still show by name.
-const sortedResumes = () => S.data.resumes.slice().sort((a, b) => b.is_default - a.is_default || (a.label || a.filename).localeCompare(b.label || b.filename));
-const resumeName = id => { const r = id && findRow("resumes", id); return r ? r.label || r.filename : ""; };
+// A resume's filename is its path in the resumes folder: "python/Ali Khan - Resume.pdf" when it has a version folder.
+const resumeFolder = r => r.filename.includes("/") ? r.filename.split("/")[0] : "";
+const resumeFile = r => r.filename.split("/").pop();
+const splitExt = name => { const i = name.lastIndexOf("."); return i > 0 ? [name.slice(0, i), name.slice(i)] : [name, ""]; };
+const resumeTitle = r => r.label || resumeFolder(r) || r.filename;
+const resumeFolders = () => [...new Set(S.data.resumes.map(resumeFolder).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+const sortedResumes = () => S.data.resumes.slice().sort((a, b) => b.is_default - a.is_default || resumeTitle(a).localeCompare(resumeTitle(b)));
+const resumeName = id => { const r = id && findRow("resumes", id); return r ? resumeTitle(r) : ""; };
 const resumeUrl = id => `/resume/${id}?t=${encodeURIComponent(TOKEN)}`;
 const resumeLink = id => { const r = findRow("resumes", id); return !r ? "" : r.missing ? esc(resumeName(id)) : `<a class="ext" href="${resumeUrl(id)}" target="_blank" rel="noopener">${esc(resumeName(id))} ↗</a>`; };
 const defaultResumeId = () => S.data.resumes.find(r => r.is_default && !r.missing)?.id ?? null;
@@ -2286,9 +2294,10 @@ function resumesSection() {
   return `<section class="sec resumes">
       <div class="sech"><h3>Resumes (${list.length})</h3><span class="sech-a">
         <button class="btn small" data-me="open-folder" title="${esc(S.data.resumes_dir)}">Open folder</button></span></div>
+      <datalist id="resume-folders">${resumeFolders().map(f => `<option value="${esc(f)}">`).join("")}</datalist>
       <button type="button" class="dropbox" data-me="upload"><b>Drop resumes here</b>, or click to choose · PDF, Word, ODT, RTF, TXT, Markdown</button>
       ${list.length ? `<div class="projects">${list.map(r => edit === `resume:${r.id}` ? resumeForm(r) : resumeCard(r)).join("")}</div>`
-        : `<p class="empty-note">Keep one file per version, like a Node.js resume and a Python resume. Files you put in the resumes folder (Open folder) show up here too.</p>`}
+        : `<p class="empty-note">Keep one file per version, each in its own folder, like python/ and nodejs/, so every file can have the name you send it under. Files you put in the resumes folder (Open folder) show up here too.</p>`}
     </section>`;
 }
 
@@ -2296,9 +2305,9 @@ function resumeCard(r) {
   const used = S.data.applications.filter(a => a.resume_id === r.id).length;
   const facts = r.missing ? [] : [fmtSize(r.size), r.modified && `changed ${fmtDate(r.modified.slice(0, 10))}`, used && `sent with ${plural(used, "application")}`].filter(Boolean);
   return `<div class="pcard rcard ${r.missing ? "missing" : ""}">
-    <div class="pcard-h"><b>${esc(r.label || r.filename)}${r.is_default ? `<span class="tag">DEFAULT</span>` : ""}</b>
+    <div class="pcard-h"><b>${esc(resumeTitle(r))}${r.is_default ? `<span class="tag">DEFAULT</span>` : ""}</b>
       <span class="pcard-a"><button class="btn small ghost" data-me="edit" data-edit="resume:${r.id}">Edit</button><button class="btn small ghost danger" data-me="del-resume" data-id="${r.id}">Delete</button></span></div>
-    ${r.label ? `<div class="file">${esc(r.filename)}</div>` : ""}
+    ${resumeTitle(r) !== r.filename ? `<div class="file">${esc(r.filename)}</div>` : ""}
     ${facts.length ? `<div class="muted">${esc(facts.join(" · "))}</div>` : ""}
     ${r.missing ? `<div class="warn">Not in the resumes folder any more${used ? `; ${plural(used, "application")} still point to it` : ""}.</div>` : ""}
     ${r.notes ? `<p>${esc(r.notes)}</p>` : ""}
@@ -2308,21 +2317,64 @@ function resumeCard(r) {
 
 function resumeForm(r) {
   return `<form class="eform" data-edit="resume:${r.id}" autocomplete="off">
-    <div class="muted" style="font-size:13px;margin-bottom:8px">${esc(r.filename)}</div>
-    ${fld("Label", `<input type="text" name="label" value="${esc(r.label)}" placeholder="e.g. Node.js backend">`)}
+    <div class="grid2">
+      ${fld("Folder", `<input type="text" name="folder" list="resume-folders" value="${esc(resumeFolder(r))}" placeholder="e.g. python">`)}
+      ${fld(`File name <span class="muted">(${esc(splitExt(resumeFile(r))[1])})</span>`, `<input type="text" name="file" value="${esc(splitExt(resumeFile(r))[0])}" ${r.missing ? "disabled" : "required"}>`)}
+    </div>
+    ${fld("Label", `<input type="text" name="label" value="${esc(r.label)}" placeholder="e.g. Node.js backend; leave blank to use the folder name">`)}
     ${fld("Notes", `<textarea name="notes" rows="2" placeholder="What this version is for, what it highlights">${esc(r.notes)}</textarea>`)}
     <div class="checks">${checkbox("is_default", r.is_default, " Default for new applications")}</div>
     ${formButtons()}
   </form>`;
 }
 
-async function uploadResumes(files) {
-  const added = [], box = $("#me .dropbox");
+// Ask which folder each new file goes in and what to call it, then upload.
+function openResumeUpload(files) {
+  const folders = resumeFolders();
+  // The name most of your resumes already share, e.g. "Ali Khan - Resume".
+  const counts = {};
+  for (const r of S.data.resumes) { const stem = splitExt(resumeFile(r))[0]; counts[stem] = (counts[stem] || 0) + 1; }
+  const common = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const shared = common && common[1] > 1 ? common[0] : "";
+  const m = openModal(`
+    <h2>Add ${files.length === 1 ? "a resume" : `${files.length} resumes`}</h2>
+    <form id="rup" autocomplete="off">
+      <p class="muted">Put each version in its own folder, like python or nodejs, and give the file the name you send it under.
+        Every version can have the same name.</p>
+      ${files.map((f, i) => {
+        const [stem, ext] = splitExt(f.name);
+        const guess = folders.find(d => f.name.toLowerCase().includes(d.toLowerCase())) || "";
+        return `<div class="rup-row"><div class="file">${esc(f.name)}</div><div class="grid2">
+          ${fld("Folder", `<input type="text" name="folder${i}" list="resume-folders" value="${esc(guess)}" placeholder="e.g. python">`)}
+          ${fld(`File name <span class="muted">(${esc(ext.toLowerCase())})</span>`, `<input type="text" name="name${i}" value="${esc(shared || stem)}" required>`)}
+        </div></div>`;
+      }).join("")}
+      <div class="actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Upload <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </form>`);
+  const form = $("#rup", m);
+  const go = () => {
+    const picks = files.map((file, i) => ({ file, folder: form.elements[`folder${i}`].value.trim(),
+      name: form.elements[`name${i}`].value.trim() + splitExt(file.name)[1].toLowerCase() }));
+    closeModal();
+    uploadResumes(picks);
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); go(); });
+  form.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); } });
+  $("[data-close]", m).onclick = closeModal;
+  $("input", form)?.focus();
+}
+
+async function uploadResumes(picks) {
+  const added = [], box = $("#me .dropbox"), files = picks.map(p => p.file);
   box?.classList.add("busy");
   for (const [i, file] of files.entries()) {
     if (box) box.textContent = `Uploading ${files.length > 1 ? `${i + 1} of ${files.length}: ` : ""}${file.name}…`;
     try {
-      const res = await fetch(`/api/resumes/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
+      const { name, folder } = picks[i];
+      const res = await fetch(`/api/resumes/upload?name=${encodeURIComponent(name)}&folder=${encodeURIComponent(folder)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || res.statusText);
       added.push(data.filename);
@@ -2346,7 +2398,13 @@ async function saveMe(form) {
   if (kind === "project" && !data.name.trim()) { form.elements.name.focus(); return toast("A project needs a name", "error"); }
   try {
     if (kind === "profile" || kind === "details") await api("PATCH", "/api/profile/1", data);
-    else if (kind === "resume") await api("PATCH", `/api/resumes/${id}`, data);
+    else if (kind === "resume") {
+      const r = findRow("resumes", +id);
+      if (!r.missing && (data.folder.trim() !== resumeFolder(r) || data.file.trim() !== splitExt(resumeFile(r))[0])) {
+        await api("POST", `/api/resumes/${id}/move`, { folder: data.folder, name: data.file });
+      }
+      await api("PATCH", `/api/resumes/${id}`, data);
+    }
     else if (id === "new") await api("POST", "/api/projects", data);
     else await api("PATCH", `/api/projects/${id}`, data);
     S.meEdit = null;
@@ -2750,7 +2808,7 @@ function wire() {
   $("#file-resume").addEventListener("change", e => {
     const files = [...e.target.files];
     e.target.value = "";
-    if (files.length) uploadResumes(files);
+    if (files.length) openResumeUpload(files);
   });
   // Drop resume files on the Resumes section (its drop box lights up) to upload them. Files dropped anywhere
   // else are ignored, so a missed drop doesn't open the file in the browser and leave the tracker.
@@ -2769,7 +2827,7 @@ function wire() {
     e.preventDefault();
     const z = dropZone(e); if (!z) return;
     z.classList.remove("drop");
-    uploadResumes([...e.dataTransfer.files]);
+    openResumeUpload([...e.dataTransfer.files]);
   });
 
   $("#file-import").addEventListener("change", e => {

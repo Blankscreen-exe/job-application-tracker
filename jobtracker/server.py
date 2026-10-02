@@ -198,7 +198,8 @@ class Handler(BaseHTTPRequestHandler):
         folder = self.server.resumes_dir
         if rest == ["upload"] and method == "POST":
             with conn:
-                row = resumes.upload(conn, folder, (query.get("name") or [""])[0], self._body())
+                row = resumes.upload(conn, folder, (query.get("name") or [""])[0], self._body(),
+                                     (query.get("folder") or [""])[0])
             self._json(200, row)
         elif rest == ["open-folder"] and method == "POST":
             resumes.open_folder(folder)
@@ -207,6 +208,11 @@ class Handler(BaseHTTPRequestHandler):
             path = resumes.path_of(conn, folder, int(rest[0]))
             (resumes.reveal if rest[1] == "reveal" else resumes.copy_to_clipboard)(path)
             self._json(200, {"ok": True})
+        elif len(rest) == 2 and rest[0].isdigit() and rest[1] == "move" and method == "POST":
+            body = self._json_body()
+            with conn:
+                row = resumes.move(conn, folder, int(rest[0]), body.get("folder") or "", body.get("name") or "")
+            self._json(200, row)
         elif len(rest) == 1 and rest[0].isdigit() and method == "DELETE":
             with conn:
                 resumes.remove(conn, folder, int(rest[0]))
