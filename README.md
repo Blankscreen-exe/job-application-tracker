@@ -3,6 +3,21 @@
 A local-only app for keeping track of the companies you're interested in and the jobs you've applied to.
 It runs in your browser, keeps everything in one file on your computer, and needs nothing but Python 3.10+.
 
+## Preview
+
+The screenshots use made-up demo data. Click one to see it full size.
+
+| | |
+|---|---|
+| **Dashboard**<br>[![Dashboard](docs/images/dashboard.png)](docs/images/dashboard.png) | **Dark theme**<br>[![Dashboard in the dark theme](docs/images/dashboard-dark.png)](docs/images/dashboard-dark.png) |
+| **Applications**<br>[![Applications table](docs/images/applications.png)](docs/images/applications.png) | **Companies**<br>[![Companies table](docs/images/companies.png)](docs/images/companies.png) |
+| **Company panel**<br>[![Company panel with applications](docs/images/company-panel.png)](docs/images/company-panel.png) | **People and log**<br>[![People cards and the log in the company panel](docs/images/people-and-log.png)](docs/images/people-and-log.png) |
+| **Calendar**<br>[![Calendar month view](docs/images/calendar.png)](docs/images/calendar.png) | **Quick entry**<br>[![New application form](docs/images/quick-add.png)](docs/images/quick-add.png) |
+| **Interview brief**<br>[![Interview brief](docs/images/interview-brief.png)](docs/images/interview-brief.png) | **Write email**<br>[![Write email prompt builder](docs/images/write-email.png)](docs/images/write-email.png) |
+| **Me**<br>[![About me and projects](docs/images/me.png)](docs/images/me.png) | **Resumes**<br>[![Resume tracks and drop box](docs/images/resumes.png)](docs/images/resumes.png) |
+
+## Features
+
 - **Quick entry.** Paste a job link and the company is filled in for you (works with Greenhouse, Lever,
   Ashby, Workable, Workday, Recruitee and company career sites). Save with `Ctrl+Enter`, or
   "Save & add another" for a batch.
@@ -21,14 +36,14 @@ It runs in your browser, keeps everything in one file on your computer, and need
   Click a day to add an event (company, which application, what, date and time), or an event to edit it.
 - **Reminders.** Tick "Set reminder" on an event (interviews are ticked by default) and it shows in
   *Coming up*, the company panel and the dashboard's next 7 days. Unticked events stay on the calendar and in the log.
-- **Resumes.** Keep each version (say a Node.js resume and a Python resume) in its own folder inside
-  `resumes/`, so every file can have the name you send it under: `python/Ali Khan - Resume.pdf`,
-  `nodejs/Ali Khan - Resume.pdf`. On the Me tab, drag files onto the drop box (or click it to choose) and pick
-  the folder and file name for each; Edit moves or renames a file without losing which applications it was
-  sent with. Give each a label and notes (the folder name is used when there's no label), pick a default, view one, show it in its folder or
-  open the folder. **Copy file** puts the resume on the clipboard: paste it into an upload box, an email or a
-  chat, or paste into a file picker's *File name* box (it holds the full path too) and press Enter. Each application has a *Resume sent* picker (the default is preselected for new ones), and
-  it shows on the card, the brief and in email prompts. Deleting a resume moves its file to `resumes/removed/`.
+- **Resumes.** One *track* per kind of resume (say Python and Node.js), each saved under one standard file
+  name you set on the Me tab, so recruiters always get `muhammad_hammad_hassan_resume.pdf` and never
+  `CV_final_v2(3).pdf`. Drop a file on the drop box and pick or name its track, or drop it on a track to
+  replace that one; whatever the file was called, it's renamed. A track keeps one file per format (a PDF and a
+  DOCX, say); uploading again replaces it, nothing old is kept. **Copy file** puts a resume on the clipboard:
+  paste it into an upload box, an email or a chat, or into a file picker's *File name* box (it holds the full
+  path too) and press Enter. Each application has a *Resume sent* picker (the default track is preselected for
+  new ones), shown on the card, the brief and in email prompts.
 - **What I told them.** Label/value rows on each application, such as the notice period or the
   salary you quoted, so you stay consistent. They show on the card, the brief and in email prompts.
 - **Write email.** Builds a prompt with everything the tracker knows (the role, company, people, history,
@@ -104,8 +119,17 @@ Everything lives in the `data/` folder inside the project, which git ignores:
 To back up or move your data, copy that folder. Set `JOBTRACKER_HOME` to keep the data somewhere else,
 for example a synced folder.
 
-Resume files live in `resumes/` inside the project, also ignored by git. Any PDF, Word, ODT, RTF, TXT or
-Markdown file you put there, or in a folder inside it (one level, not `removed/`), shows up in the app; set `JOBTRACKER_RESUMES` to use another folder.
+Resumes live in `resumes/` inside the project, also ignored by git, one folder per track:
+
+```text
+resumes/python/muhammad_hammad_hassan_resume.pdf
+resumes/python/muhammad_hammad_hassan_resume.docx
+resumes/nodejs/muhammad_hammad_hassan_resume.pdf
+```
+
+A folder you make there yourself shows up as a track. Only files under the standard name count (PDF, Word,
+ODT, RTF, TXT or Markdown); anything else in the folder is left alone. Set `JOBTRACKER_RESUMES` to use
+another folder.
 
 ## Settings
 
@@ -142,3 +166,7 @@ browser can't read or change your data. Nothing is sent anywhere.
 ```sh
 python -m unittest discover -s tests
 ```
+
+## License
+
+[MIT](LICENSE)

@@ -141,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, f"{ctype}; charset=utf-8",
                               {"Content-Disposition": f'attachment; filename="{filename}"'})
         if parts[0] == "resume" and len(parts) == 2 and parts[1].isdigit() and method == "GET":
-            path = resumes.path_of(conn, self.server.resumes_dir, int(parts[1]))
+            path = resumes.file_of(conn, self.server.resumes_dir, int(parts[1]), (query.get("ext") or [""])[0])
             disposition = f"inline; filename*=UTF-8''{quote(path.name)}"
             return self._send(200, path.read_bytes(), resumes.content_type(path), {"Content-Disposition": disposition})
         if parts[0] != "api" or len(parts) < 2:
@@ -196,31 +196,33 @@ class Handler(BaseHTTPRequestHandler):
     def _resume_route(self, conn: sqlite3.Connection, method: str, rest: list[str], query: dict) -> bool:
         """Resume calls that touch the folder. Label, notes and default go through the generic PATCH."""
         folder = self.server.resumes_dir
+        arg = lambda key: (query.get(key) or [""])[0]  # noqa: E731
+        track_id = int(rest[0]) if rest and rest[0].isdigit() else None
         if rest == ["upload"] and method == "POST":
             with conn:
-                row = resumes.upload(conn, folder, (query.get("name") or [""])[0], self._body(),
-                                     (query.get("folder") or [""])[0])
+                row = resumes.upload(conn, folder, arg("track"), arg("name"), self._body())
             self._json(200, row)
+        elif rest == ["filename"] and method == "POST":
+            with conn:
+                name = resumes.set_standard_name(conn, folder, str(self._json_body().get("name") or ""))
+            self._json(200, {"name": name})
         elif rest == ["open-folder"] and method == "POST":
             resumes.open_folder(folder)
             self._json(200, {"ok": True})
-        elif len(rest) == 2 and rest[0].isdigit() and rest[1] in ("reveal", "copy") and method == "POST":
-            path = resumes.path_of(conn, folder, int(rest[0]))
+        elif track_id and rest[1:] in (["reveal"], ["copy"]) and method == "POST":
+            path = resumes.file_of(conn, folder, track_id, arg("ext"))
             (resumes.reveal if rest[1] == "reveal" else resumes.copy_to_clipboard)(path)
+            self._json(200, {"ok": True, "file": path.name})
+        elif track_id and rest[1:] == ["file"] and method == "DELETE":
+            resumes.delete_file(conn, folder, track_id, arg("ext"))
             self._json(200, {"ok": True})
-        elif len(rest) == 2 and rest[0].isdigit() and rest[1] == "move" and method == "POST":
-            body = self._json_body()
+        elif track_id and len(rest) == 1 and method == "DELETE":
             with conn:
-                row = resumes.move(conn, folder, int(rest[0]), body.get("folder") or "", body.get("name") or "")
-            self._json(200, row)
-        elif len(rest) == 1 and rest[0].isdigit() and method == "DELETE":
-            with conn:
-                resumes.remove(conn, folder, int(rest[0]))
+                resumes.remove(conn, folder, track_id)
             self._json(200, {"ok": True})
         else:
             return False
         return True
-
 
 def serve(db_file: Path, cfg: dict, *, port: int | None = None, open_browser: bool = True) -> None:
     first = port or cfg["port"]
