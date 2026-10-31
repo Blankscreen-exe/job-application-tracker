@@ -166,3 +166,7 @@ browser can't read or change your data. Nothing is sent anywhere.
 ```sh
 python -m unittest discover -s tests
 ```
+
+## License
+
+[MIT](LICENSE)
