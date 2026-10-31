@@ -1,8 +1,13 @@
-"""Resume versions: the files live in a folder (resumes/ in the project), the tracker keeps a label,
-a note and which one is the default.
+"""Resume tracks: one folder per kind of resume (python/, nodejs/), each holding your current resume under
+one standard file name, so whatever you send is called the same thing:
 
-The folder is the source of truth. Drop a file in and it shows up; upload one from the app and it is
-written there. Deleting from the app moves the file to removed/ inside the folder rather than erasing it.
+    resumes/python/muhammad_hammad_hassan_resume.pdf
+    resumes/python/muhammad_hammad_hassan_resume.docx
+    resumes/nodejs/muhammad_hammad_hassan_resume.pdf
+
+A track holds one file per format. Uploading to a track replaces the file of that format; nothing is kept.
+The folder is the source of truth: a new folder shows up as a track. The tracker keeps each track's label,
+notes and whether it is the default. Files in a track folder under any other name are ignored.
 """
 
 from __future__ import annotations
@@ -19,97 +24,166 @@ from pathlib import Path
 
 from . import db
 
+# Formats a resume can be, in the order they are preferred for View and Copy file.
 EXTENSIONS = (".pdf", ".docx", ".doc", ".odt", ".rtf", ".txt", ".md")
-REMOVED = "removed"
+# Folders that are never tracks. removed/ held deleted files in the first layout.
+NOT_TRACKS = {"removed"}
 UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def files(folder: Path) -> list[Path]:
-    """Resume files directly inside the folder (not in removed/ or other subfolders)."""
-    return sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in EXTENSIONS
-                  and not p.name.startswith(("~$", ".")))
+# --- the standard file name -------------------------------------------------------------------
+
+def standard_name(conn: sqlite3.Connection) -> str:
+    return conn.execute("SELECT resume_filename FROM profile WHERE id = 1").fetchone()[0]
+
+
+def clean_name(name: str) -> str:
+    """The file name without an extension, safe on every OS: "My CV.pdf" -> "My CV"."""
+    name = UNSAFE.sub("_", (name or "").strip())
+    stem, ext = os.path.splitext(name)
+    if ext.lower() in EXTENSIONS:
+        name = stem
+    elif name.lower() in EXTENSIONS:  # just ".pdf"
+        name = ""
+    name = name.strip(" .")
+    if not name:
+        raise db.ValidationError("The resume file name can't be blank")
+    return name
+
+
+def set_standard_name(conn: sqlite3.Connection, folder: Path, name: str) -> str:
+    """Change the file name every resume is saved under, renaming the files already there."""
+    new, old = clean_name(name), standard_name(conn)
+    if old and new != old:
+        for track in _track_dirs(folder):
+            for ext in EXTENSIONS:
+                src = track / f"{old}{ext}"
+                if src.is_file():
+                    src.replace(track / f"{new}{ext}")
+    conn.execute("UPDATE profile SET resume_filename = ?, updated_at = ? WHERE id = 1", (new, db.now()))
+    return new
+
+
+# --- tracks -----------------------------------------------------------------------------------
+
+def track_slug(name: str) -> str:
+    """A folder name for a track: "Node.js" -> "nodejs", "Python / data" -> "python-data"."""
+    slug = re.sub(r"\s+", "-", (name or "").strip().lower())
+    slug = re.sub(r"-{2,}", "-", re.sub(r"[^a-z0-9_-]", "", slug)).strip("-_")
+    if not slug:
+        raise db.ValidationError("A track needs a name with letters or numbers, like Python")
+    if slug in NOT_TRACKS:
+        raise db.ValidationError(f"{slug} can't be used as a track name")
+    return slug
+
+
+def _track_dirs(folder: Path) -> list[Path]:
+    return sorted(p for p in folder.iterdir() if p.is_dir() and p.name.lower() not in NOT_TRACKS
+                  and not p.name.startswith("."))
+
+
+def _insert(conn: sqlite3.Connection, track: str, label: str = "") -> dict:
+    stamp = db.now()
+    first = conn.execute("SELECT COUNT(*) FROM resumes").fetchone()[0] == 0
+    cur = conn.execute("INSERT INTO resumes (track, label, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                       (track, label, int(first), stamp, stamp))
+    return db.get(conn, "resumes", cur.lastrowid)  # type: ignore[return-value]
+
+
+def _find(conn: sqlite3.Connection, track: str) -> dict | None:
+    return db._row("resumes", conn.execute("SELECT * FROM resumes WHERE track = ?", (track,)).fetchone())
+
+
+def _get(conn: sqlite3.Connection, row_id: int) -> dict:
+    row = db.get(conn, "resumes", row_id)
+    if row is None:
+        raise db.NotFound(f"resume {row_id}")
+    return row
 
 
 def sync(conn: sqlite3.Connection, folder: Path) -> None:
-    """Add a row for every file in the folder that the tracker hasn't seen yet."""
-    known = {r["filename"].lower() for r in conn.execute("SELECT filename FROM resumes")}
-    for path in files(folder):
+    """Add a track for every folder the tracker hasn't seen yet."""
+    known = {r["track"].lower() for r in conn.execute("SELECT track FROM resumes")}
+    for path in _track_dirs(folder):
         if path.name.lower() not in known:
             _insert(conn, path.name)
 
 
-def _insert(conn: sqlite3.Connection, filename: str) -> dict:
-    stamp = db.now()
-    first = conn.execute("SELECT COUNT(*) FROM resumes").fetchone()[0] == 0
-    cur = conn.execute("INSERT INTO resumes (filename, is_default, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                       (filename, int(first), stamp, stamp))
-    return db.get(conn, "resumes", cur.lastrowid)  # type: ignore[return-value]
+def _files(track_dir: Path, name: str) -> list[Path]:
+    if not name or not track_dir.is_dir():
+        return []
+    return [p for ext in EXTENSIONS if (p := track_dir / f"{name}{ext}").is_file()]
 
 
 def listing(conn: sqlite3.Connection, folder: Path) -> list[dict]:
-    """Every resume row, with whether its file is still there, its size and when it last changed."""
-    out = []
+    """Every track, whether its folder is still there, and its files (preferred format first)."""
+    name, out = standard_name(conn), []
     for row in db.all_rows(conn, "resumes"):
-        path = folder / row["filename"]
-        stat = path.stat() if path.is_file() else None
-        out.append({**row, "missing": stat is None, "size": stat.st_size if stat else 0,
-                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds") if stat else ""})
+        track_dir = folder / row["track"]
+        files = []
+        for path in _files(track_dir, name):
+            stat = path.stat()
+            files.append({"ext": path.suffix.lstrip("."), "name": path.name, "size": stat.st_size,
+                          "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds")})
+        out.append({**row, "missing": not track_dir.is_dir(), "files": files})
     return out
 
 
-def safe_name(name: str) -> str:
-    """A filename that is fine on every OS, keeping the extension; refuses types that aren't resumes."""
-    name = UNSAFE.sub("_", Path(name.replace("\\", "/")).name).strip(" .")
-    stem, ext = os.path.splitext(name)
-    if ext.lower() not in EXTENSIONS:
+def upload(conn: sqlite3.Connection, folder: Path, track: str, original_name: str, data: bytes) -> dict:
+    """Save a file as the track's resume in that format, replacing the one there. Makes the track if it's new."""
+    name = standard_name(conn)
+    if not name:
+        raise db.ValidationError("Set your resume file name first")
+    ext = os.path.splitext(original_name or "")[1].lower()
+    if ext not in EXTENSIONS:
         raise db.ValidationError(f"Resumes can be {', '.join(e.lstrip('.').upper() for e in EXTENSIONS)}")
-    return (stem.strip() or "resume") + ext.lower()
-
-
-def _free(folder: Path, name: str) -> Path:
-    """folder/name, or folder/'name (2).ext' and so on if that is taken."""
-    path, stem, ext, n = folder / name, Path(name).stem, Path(name).suffix, 2
-    while path.exists():
-        path, n = folder / f"{stem} ({n}){ext}", n + 1
-    return path
-
-
-def upload(conn: sqlite3.Connection, folder: Path, name: str, data: bytes) -> dict:
     if not data:
         raise db.ValidationError("That file is empty")
-    path = _free(folder, safe_name(name))
-    path.write_bytes(data)
-    try:
-        return _insert(conn, path.name)
-    except Exception:
-        path.unlink(missing_ok=True)
-        raise
+    slug = track_slug(track)
+    row = _find(conn, slug) or _insert(conn, slug, track.strip())
+    track_dir = folder / row["track"]
+    track_dir.mkdir(exist_ok=True)
+    target = track_dir / f"{name}{ext}"
+    tmp = target.with_name(target.name + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(target)
+    return row
 
 
-def path_of(conn: sqlite3.Connection, folder: Path, row_id: int) -> Path:
-    row = db.get(conn, "resumes", row_id)
-    if row is None:
-        raise db.NotFound(f"resume {row_id}")
-    path = folder / row["filename"]
-    if not path.is_file():
-        raise db.ValidationError(f"{row['filename']} is no longer in the resumes folder")
-    return path
+def file_of(conn: sqlite3.Connection, folder: Path, row_id: int, ext: str = "") -> Path:
+    """The track's file in that format, or its preferred one."""
+    row = _get(conn, row_id)
+    files = _files(folder / row["track"], standard_name(conn))
+    if ext:
+        files = [p for p in files if p.suffix.lower() == "." + ext.lower().lstrip(".")]
+    if not files:
+        raise db.ValidationError(f"{row['label'] or row['track']} has no {ext.upper() + ' ' if ext else ''}file yet")
+    return files[0]
+
+
+def delete_file(conn: sqlite3.Connection, folder: Path, row_id: int, ext: str) -> None:
+    file_of(conn, folder, row_id, ext).unlink()
 
 
 def remove(conn: sqlite3.Connection, folder: Path, row_id: int) -> None:
-    """Forget a resume and move its file to removed/, so it doesn't come back on the next sync."""
-    row = db.get(conn, "resumes", row_id)
-    if row is None:
-        raise db.NotFound(f"resume {row_id}")
-    path = folder / row["filename"]
-    if path.is_file():
-        bin_dir = folder / REMOVED
-        bin_dir.mkdir(exist_ok=True)
-        shutil.move(str(path), str(_free(bin_dir, path.name)))
+    """Delete a track: its resume files and its folder. Other files in the folder block this, so nothing
+    you put there yourself is lost."""
+    row = _get(conn, row_id)
+    track_dir = folder / row["track"]
+    if track_dir.is_dir():
+        mine = set(_files(track_dir, standard_name(conn)))
+        others = [p.name for p in track_dir.iterdir() if p not in mine]
+        if others:
+            raise db.ValidationError(f"{row['track']}/ also holds {', '.join(sorted(others)[:3])}; move those out first")
+        for path in mine:
+            path.unlink()
+        track_dir.rmdir()
     db.delete(conn, "resumes", row_id)
     if row["is_default"]:
         conn.execute("UPDATE resumes SET is_default = 1 WHERE id = (SELECT MIN(id) FROM resumes)")
 
+
+# --- the OS: open, reveal, copy ---------------------------------------------------------------
 
 def content_type(path: Path) -> str:
     return mimetypes.guess_type(path.name)[0] or "application/octet-stream"

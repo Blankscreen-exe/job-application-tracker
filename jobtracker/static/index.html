@@ -381,10 +381,18 @@ select.st option { color: var(--ink); background: var(--bg); }
 .resumes.drop .dropbox { border-color: var(--accent); background: var(--hover); color: var(--ink); }
 .dropbox.busy { cursor: progress; border-color: var(--ink); }
 .rcard.missing { border-style: dashed; }
+.rcard.drop { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--hover); }
 .rcard .file { font-size: 13px; color: var(--muted); }
-.rcard .warn { color: var(--accent); font-weight: 700; font-size: 13px; }
-.rcard .plinks button { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; }
-.rcard .plinks button:hover { color: var(--accent); }
+.rcard .warn { color: var(--accent); font-weight: 700; font-size: 13px; margin-top: 8px; }
+.rcard .empty-note { margin-top: 8px; }
+.rfile { display: flex; gap: 4px 10px; align-items: baseline; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+.rfile b { min-width: 38px; }
+.racts { display: flex; gap: 12px; margin-left: auto; }
+.racts .ext { margin-left: 0; }
+.racts button, .rcard-f button { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; }
+.racts button:hover, .rcard-f button:hover { color: var(--accent); }
+.rcard-f { display: flex; gap: 12px; justify-content: space-between; margin-top: 10px; font-size: 13px; }
+.rname { margin: 0 0 12px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* prompts */
 .prompt-out { font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; background: var(--hover); padding: 10px 12px; border: 0; }
@@ -662,18 +670,20 @@ const statusSelect = (a, extra = "") =>
 const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 const href = url => /^https?:\/\//i.test(url) ? url : "https://" + url;
 
-// Resumes: a label if you gave one, else the file name. Missing files still show by name.
-const sortedResumes = () => S.data.resumes.slice().sort((a, b) => b.is_default - a.is_default || (a.label || a.filename).localeCompare(b.label || b.filename));
-const resumeName = id => { const r = id && findRow("resumes", id); return r ? r.label || r.filename : ""; };
-const resumeUrl = id => `/resume/${id}?t=${encodeURIComponent(TOKEN)}`;
-const resumeLink = id => { const r = findRow("resumes", id); return !r ? "" : r.missing ? esc(resumeName(id)) : `<a class="ext" href="${resumeUrl(id)}" target="_blank" rel="noopener">${esc(resumeName(id))} ↗</a>`; };
-const defaultResumeId = () => S.data.resumes.find(r => r.is_default && !r.missing)?.id ?? null;
+// Resume tracks (Python, Node.js…): a folder each, holding your resume under one standard file name.
+const trackName = r => r.label || r.track;
+const sortedResumes = () => S.data.resumes.slice().sort((a, b) => b.is_default - a.is_default || trackName(a).localeCompare(trackName(b)));
+const resumeName = id => { const r = id && findRow("resumes", id); return r ? trackName(r) : ""; };
+const resumeUrl = (id, ext = "") => `/resume/${id}?${ext ? `ext=${ext}&` : ""}t=${encodeURIComponent(TOKEN)}`;
+const resumeLink = id => { const r = findRow("resumes", id); return !r ? "" : r.files.length ? `<a class="ext" href="${resumeUrl(id)}" target="_blank" rel="noopener">${esc(trackName(r))} ↗</a>` : esc(trackName(r)); };
+const defaultResumeId = () => S.data.resumes.find(r => r.is_default && r.files.length)?.id ?? null;
 const fmtSize = n => n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`;
-// The "Resume sent" picker; nothing at all until you have a resume.
+const extOf = name => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
+// The "Resume sent" picker; nothing at all until you have a track.
 function resumeField(current) {
   if (!S.data.resumes.length) return "";
-  const opts = sortedResumes().filter(r => !r.missing || r.id === current)
-    .map(r => `<option value="${r.id}" ${r.id === current ? "selected" : ""}>${esc(r.label || r.filename)}</option>`).join("");
+  const opts = sortedResumes().filter(r => r.files.length || r.id === current)
+    .map(r => `<option value="${r.id}" ${r.id === current ? "selected" : ""}>${esc(trackName(r))}</option>`).join("");
   return fld("Resume sent", `<select name="resume_id"><option value="">None</option>${opts}</select>`);
 }
 
@@ -2144,7 +2154,8 @@ function drawBrief(canvas, cid, appId) {
 
 // ---------- me: about me, portfolio projects and resumes ---------------------------------------
 
-// S.meEdit says which part of the Me page is a form: "profile", "project:<id>", "project:new" or "resume:<id>".
+// S.meEdit says which part of the Me page is a form: "profile", "project:<id>", "project:new", "resume:<id>"
+// or "resume-name".
 function renderMe() {
   const p = S.data.profile[0], edit = S.meEdit;
   const projects = S.data.projects.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -2234,55 +2245,107 @@ function projectForm(pr) {
 }
 
 function resumesSection() {
-  const list = sortedResumes(), edit = S.meEdit;
+  const list = sortedResumes(), edit = S.meEdit, name = S.data.profile[0].resume_filename;
   return `<section class="sec resumes">
       <div class="sech"><h3>Resumes (${list.length})</h3><span class="sech-a">
         <button class="btn small" data-me="open-folder" title="${esc(S.data.resumes_dir)}">Open folder</button></span></div>
-      <button type="button" class="dropbox" data-me="upload"><b>Drop resumes here</b>, or click to choose · PDF, Word, ODT, RTF, TXT, Markdown</button>
+      ${!name || edit === "resume-name" ? resumeNameForm(name)
+        : `<p class="rname"><span>Every resume is saved as <b>${esc(name)}.pdf</b> (or .docx and so on)</span><button class="btn small ghost" data-me="edit" data-edit="resume-name">Change</button></p>`}
+      ${name ? `<button type="button" class="dropbox" data-me="upload"><b>Drop a resume here</b>, or click to choose · drop it on a track below to replace that one</button>` : ""}
       ${list.length ? `<div class="projects">${list.map(r => edit === `resume:${r.id}` ? resumeForm(r) : resumeCard(r)).join("")}</div>`
-        : `<p class="empty-note">Keep one file per version, like a Node.js resume and a Python resume. Files you put in the resumes folder (Open folder) show up here too.</p>`}
+        : name ? `<p class="empty-note">Make a track for each kind of resume, like Python and Node.js: drop a file above and name its track. Each track keeps one file per format; uploading again replaces it.</p>` : ""}
     </section>`;
+}
+
+function resumeNameForm(name) {
+  return `<form class="eform" data-edit="resume-name" autocomplete="off">
+    ${fld("Resume file name", `<input type="text" name="name" value="${esc(name)}" placeholder="e.g. muhammad_hammad_hassan_resume" required>`)}
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Every resume you upload is saved under this name, so recruiters always get the same tidy file. The extension (.pdf, .docx) is kept from the file.${name ? " Changing it renames your resumes." : ""}</p>
+    ${formButtons()}
+  </form>`;
 }
 
 function resumeCard(r) {
   const used = S.data.applications.filter(a => a.resume_id === r.id).length;
-  const facts = r.missing ? [] : [fmtSize(r.size), r.modified && `changed ${fmtDate(r.modified.slice(0, 10))}`, used && `sent with ${plural(used, "application")}`].filter(Boolean);
-  return `<div class="pcard rcard ${r.missing ? "missing" : ""}">
-    <div class="pcard-h"><b>${esc(r.label || r.filename)}${r.is_default ? `<span class="tag">DEFAULT</span>` : ""}</b>
+  const files = r.files.map(f => `<div class="rfile"><b>${esc(f.ext.toUpperCase())}</b>
+      <span class="muted">${fmtSize(f.size)} · ${fmtDate(f.modified.slice(0, 10))}</span>
+      <span class="racts"><a class="ext" href="${resumeUrl(r.id, f.ext)}" target="_blank" rel="noopener">View ↗</a><button data-me="copy-resume" data-id="${r.id}" data-ext="${esc(f.ext)}" title="Paste it into an upload box, an email or a chat, or into a file picker's File name box">Copy file</button><button data-me="del-file" data-id="${r.id}" data-ext="${esc(f.ext)}" title="Delete this ${esc(f.ext.toUpperCase())}">✕</button></span></div>`).join("");
+  return `<div class="pcard rcard ${r.missing ? "missing" : ""}" data-track="${r.id}">
+    <div class="pcard-h"><b>${esc(trackName(r))}${r.is_default ? `<span class="tag">DEFAULT</span>` : ""}</b>
       <span class="pcard-a"><button class="btn small ghost" data-me="edit" data-edit="resume:${r.id}">Edit</button><button class="btn small ghost danger" data-me="del-resume" data-id="${r.id}">Delete</button></span></div>
-    ${r.label ? `<div class="file">${esc(r.filename)}</div>` : ""}
-    ${facts.length ? `<div class="muted">${esc(facts.join(" · "))}</div>` : ""}
-    ${r.missing ? `<div class="warn">Not in the resumes folder any more${used ? `; ${plural(used, "application")} still point to it` : ""}.</div>` : ""}
+    <div class="file">${esc(r.track)}/</div>
+    ${r.missing ? `<div class="warn">The folder resumes/${esc(r.track)}/ is gone. Drop a file here to bring the track back.</div>`
+      : files || `<p class="empty-note">No resume yet. Drop one on this card.</p>`}
     ${r.notes ? `<p>${esc(r.notes)}</p>` : ""}
-    ${r.missing ? "" : `<div class="plinks"><a class="ext" href="${resumeUrl(r.id)}" target="_blank" rel="noopener">View ↗</a><button data-me="copy-resume" data-id="${r.id}" title="Paste it into an upload box, an email or a chat, or into a file picker's File name box">Copy file</button><button data-me="reveal" data-id="${r.id}">Show in folder</button></div>`}
+    <div class="rcard-f"><span class="muted">${used ? `Sent with ${plural(used, "application")}` : ""}</span>${r.files.length ? `<button data-me="reveal" data-id="${r.id}">Show in folder</button>` : ""}</div>
   </div>`;
 }
 
 function resumeForm(r) {
   return `<form class="eform" data-edit="resume:${r.id}" autocomplete="off">
-    <div class="muted" style="font-size:13px;margin-bottom:8px">${esc(r.filename)}</div>
-    ${fld("Label", `<input type="text" name="label" value="${esc(r.label)}" placeholder="e.g. Node.js backend">`)}
-    ${fld("Notes", `<textarea name="notes" rows="2" placeholder="What this version is for, what it highlights">${esc(r.notes)}</textarea>`)}
+    <div class="muted" style="font-size:13px;margin-bottom:8px">resumes/${esc(r.track)}/</div>
+    ${fld("Name", `<input type="text" name="label" value="${esc(r.label)}" placeholder="e.g. Node.js backend">`)}
+    ${fld("Notes", `<textarea name="notes" rows="2" placeholder="What this resume is for, what it highlights">${esc(r.notes)}</textarea>`)}
     <div class="checks">${checkbox("is_default", r.is_default, " Default for new applications")}</div>
     ${formButtons()}
   </form>`;
 }
 
-async function uploadResumes(files) {
-  const added = [], box = $("#me .dropbox");
+// The track a typed name means: an existing one by name or folder, else none (a new track).
+const findTrack = typed => S.data.resumes.find(r => [r.label, r.track].some(n => n && n.toLowerCase() === typed.trim().toLowerCase()));
+
+// Ask which track dropped or chosen files go to.
+function chooseTrack(files) {
+  const name = S.data.profile[0].resume_filename;
+  const m = openModal(`
+    <h2>Add resume</h2>
+    <form id="rt" autocomplete="off">
+      <p style="margin-top:0">${files.map(f => `${esc(f.name)} → <b>${esc(name + extOf(f.name))}</b>`).join("<br>")}</p>
+      ${fld("Track", `<input type="text" name="track" list="rt-tracks" placeholder="e.g. Python, Node.js" required>`)}
+      <datalist id="rt-tracks">${sortedResumes().map(r => `<option value="${esc(trackName(r))}">`).join("")}</datalist>
+      <div class="cohint" id="rt-hint">Pick a track to replace its resume, or type a new one.</div>
+      <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Save</button></div>
+    </form>`);
+  const form = $("#rt", m), input = form.elements.track, hint = $("#rt-hint", m);
+  const exts = files.map(f => extOf(f.name).slice(1).toUpperCase()).join(" and ");
+  input.addEventListener("input", () => {
+    const t = input.value.trim(), r = t && findTrack(t);
+    hint.innerHTML = !t ? "Pick a track to replace its resume, or type a new one."
+      : r ? (files.some(f => r.files.some(x => "." + x.ext === extOf(f.name))) ? `Replaces the ${esc(exts)} in <b>${esc(trackName(r))}</b>.` : `Adds the ${esc(exts)} to <b>${esc(trackName(r))}</b>.`)
+      : `New track <b>${esc(t)}</b>.`;
+  });
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const t = input.value.trim();
+    if (!t) return input.focus();
+    closeModal();
+    uploadResumes(files, findTrack(t)?.track || t, true);
+  });
+  $("[data-close]", m).onclick = closeModal;
+  input.focus();
+}
+
+// Upload files to a track (its folder name, or a new name). Without one, ask which track.
+async function uploadResumes(files, track, confirmed = false) {
+  if (!S.data.profile[0].resume_filename) { openMeEdit("resume-name"); return toast("Set your resume file name first", "error"); }
+  if (!track) return chooseTrack(files);
+  const r = findTrack(track);
+  const replacing = files.filter(f => r?.files.some(x => "." + x.ext === extOf(f.name)));
+  if (replacing.length && !confirmed && !confirm(`Replace the ${replacing.map(f => extOf(f.name).slice(1).toUpperCase()).join(" and ")} in ${trackName(r)}? The current file is deleted.`)) return;
+  const saved = [], box = $("#me .dropbox");
   box?.classList.add("busy");
-  for (const [i, file] of files.entries()) {
-    if (box) box.textContent = `Uploading ${files.length > 1 ? `${i + 1} of ${files.length}: ` : ""}${file.name}…`;
+  for (const file of files) {
+    if (box) box.textContent = `Uploading ${file.name}…`;
     try {
-      const res = await fetch(`/api/resumes/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
+      const res = await fetch(`/api/resumes/upload?track=${encodeURIComponent(track)}&name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: file });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || res.statusText);
-      added.push(data.filename);
+      saved.push(`${data.track}/${S.data.profile[0].resume_filename}${extOf(file.name)}`);
     } catch (err) { toast(`${file.name}: ${err.message}`, "error"); }
   }
-  if (!added.length) return renderMe();
+  if (!saved.length) return renderMe();
   await reload(); renderMain();
-  toast(added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} resumes`);
+  toast(`Saved ${saved.join(", ")}`);
 }
 
 function openMeEdit(key) {
@@ -2299,6 +2362,7 @@ async function saveMe(form) {
   try {
     if (kind === "profile") await api("PATCH", "/api/profile/1", data);
     else if (kind === "resume") await api("PATCH", `/api/resumes/${id}`, data);
+    else if (kind === "resume-name") await api("POST", "/api/resumes/filename", { name: data.name });
     else if (id === "new") await api("POST", "/api/projects", data);
     else await api("PATCH", `/api/projects/${id}`, data);
     S.meEdit = null;
@@ -2324,16 +2388,23 @@ async function meAction(act, el) {
       case "open-folder": return await api("POST", "/api/resumes/open-folder");
       case "reveal": return await api("POST", `/api/resumes/${el.dataset.id}/reveal`);
       case "copy-resume": {
-        await api("POST", `/api/resumes/${el.dataset.id}/copy`);
-        return toast(`Copied ${resumeName(+el.dataset.id)}. Paste it into an upload box, or into a file picker's File name box`);
+        const out = await api("POST", `/api/resumes/${el.dataset.id}/copy?ext=${el.dataset.ext}`);
+        return toast(`Copied ${out.file}. Paste it into an upload box, or into a file picker's File name box`);
+      }
+      case "del-file": {
+        const r = findRow("resumes", +el.dataset.id), ext = el.dataset.ext.toUpperCase();
+        if (!confirm(`Delete the ${ext} from ${trackName(r)}? This can't be undone.`)) return;
+        await api("DELETE", `/api/resumes/${r.id}/file?ext=${el.dataset.ext}`);
+        await reload(); renderMain();
+        return toast(`Deleted the ${ext} from ${trackName(r)}`);
       }
       case "del-resume": {
         const r = findRow("resumes", +el.dataset.id), used = S.data.applications.filter(a => a.resume_id === r.id).length;
-        const note = r.missing ? "" : " The file is moved to resumes/removed, not erased.";
-        if (!confirm(`Delete ${r.label || r.filename}?${note}${used ? ` ${plural(used, "application")} will no longer show which resume was sent.` : ""}`)) return;
+        const files = r.files.length ? ` and its ${r.files.map(f => f.ext.toUpperCase()).join(" and ")}` : "";
+        if (!confirm(`Delete the ${trackName(r)} track${files}? This can't be undone.${used ? ` ${plural(used, "application")} will no longer show which resume was sent.` : ""}`)) return;
         await api("DELETE", `/api/resumes/${r.id}`);
         await reload(); renderMain();
-        return toast(`Deleted ${r.label || r.filename}`);
+        return toast(`Deleted ${trackName(r)}`);
       }
     }
   } catch (err) { toast(err.message, "error"); }
@@ -2685,24 +2756,28 @@ function wire() {
     e.target.value = "";
     if (files.length) uploadResumes(files);
   });
-  // Drop resume files on the Resumes section (its drop box lights up) to upload them. Files dropped anywhere
-  // else are ignored, so a missed drop doesn't open the file in the browser and leave the tracker.
+  // Drop resume files on a track card to replace that track's file, or anywhere else in the Resumes section
+  // (its drop box lights up) to pick a track. Files dropped anywhere else are ignored, so a missed drop
+  // doesn't open the file in the browser and leave the tracker.
   const hasFiles = e => e.dataTransfer?.types.includes("Files");
   const dropZone = e => hasFiles(e) && e.target.closest?.("#me .resumes");
+  const clearDrop = () => $$("#me .drop").forEach(el => el.classList.remove("drop"));
   document.addEventListener("dragover", e => {
     if (!hasFiles(e)) return;
     e.preventDefault();
-    const z = dropZone(e);
+    const z = dropZone(e), card = z && e.target.closest(".rcard");
     e.dataTransfer.dropEffect = z ? "copy" : "none";
-    z?.classList.add("drop");
+    clearDrop();
+    (card || z)?.classList.add("drop");
   });
-  document.addEventListener("dragleave", e => { const z = e.target.closest?.("#me .resumes"); if (z && !z.contains(e.relatedTarget)) z.classList.remove("drop"); });
+  document.addEventListener("dragleave", e => { if (!e.relatedTarget || !e.relatedTarget.closest?.("#me .resumes")) clearDrop(); });
   document.addEventListener("drop", e => {
     if (!hasFiles(e)) return;
     e.preventDefault();
+    clearDrop();
     const z = dropZone(e); if (!z) return;
-    z.classList.remove("drop");
-    uploadResumes([...e.dataTransfer.files]);
+    const card = e.target.closest(".rcard");
+    uploadResumes([...e.dataTransfer.files], card ? findRow("resumes", +card.dataset.track).track : null);
   });
 
   $("#file-import").addEventListener("change", e => {

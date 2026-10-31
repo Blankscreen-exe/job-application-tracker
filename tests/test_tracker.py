@@ -246,48 +246,86 @@ class ResumeTests(unittest.TestCase):
         self.conn.close()
         self.tmp.cleanup()
 
-    def test_folder_sync_and_default(self):
-        (self.folder / "node.pdf").write_bytes(b"%PDF node")
-        (self.folder / "notes.xlsx").write_bytes(b"not a resume")
-        (self.folder / "~$python.docx").write_bytes(b"word lock file")
-        resumes.sync(self.conn, self.folder)
-        resumes.sync(self.conn, self.folder)  # nothing new the second time
-        (self.folder / "python.docx").write_bytes(b"docx")
-        resumes.sync(self.conn, self.folder)
-        rows = resumes.listing(self.conn, self.folder)
-        self.assertEqual([(r["filename"], r["is_default"]) for r in rows], [("node.pdf", True), ("python.docx", False)])
-        db.update(self.conn, "resumes", rows[1]["id"], {"is_default": True, "label": "Python"})
-        self.assertEqual([r["is_default"] for r in db.all_rows(self.conn, "resumes")], [False, True])
-        (self.folder / "node.pdf").unlink()
-        self.assertTrue(resumes.listing(self.conn, self.folder)[0]["missing"])
+    def test_names(self):
+        self.assertEqual(resumes.clean_name(" My: CV.PDF "), "My_ CV")
+        self.assertEqual(resumes.clean_name("hassan_resume"), "hassan_resume")
         with self.assertRaises(db.ValidationError):
-            db.insert(self.conn, "resumes", {"label": "no file"})
+            resumes.clean_name(" .pdf ")
+        self.assertEqual(resumes.track_slug("Node.js"), "nodejs")
+        self.assertEqual(resumes.track_slug("Python / data"), "python-data")
+        for bad in ("", "!!", "removed"):
+            with self.assertRaises(db.ValidationError):
+                resumes.track_slug(bad)
 
-    def test_upload_names(self):
-        self.assertEqual(resumes.safe_name(r'..\x/My: CV.PDF'), "My_ CV.pdf")
+    def test_upload_replaces_and_keeps_one_file_per_format(self):
         with self.assertRaises(db.ValidationError):
-            resumes.safe_name("evil.exe")
-        first = resumes.upload(self.conn, self.folder, "cv.pdf", b"one")
-        second = resumes.upload(self.conn, self.folder, "CV.pdf", b"two")
-        self.assertEqual((first["filename"], second["filename"]), ("cv.pdf", "CV (2).pdf"))
-        self.assertEqual((self.folder / "CV (2).pdf").read_bytes(), b"two")
-        with self.assertRaises(db.ValidationError):
-            resumes.upload(self.conn, self.folder, "empty.pdf", b"")
+            resumes.upload(self.conn, self.folder, "Python", "cv.pdf", b"x")  # no file name set yet
+        resumes.set_standard_name(self.conn, self.folder, "NAME.pdf")
+        python = resumes.upload(self.conn, self.folder, "Python", "hammad_CV_latest_final_13.pdf", b"one")
+        self.assertEqual((python["track"], python["label"], python["is_default"]), ("python", "Python", True))
+        resumes.upload(self.conn, self.folder, "python", "other.PDF", b"two")
+        resumes.upload(self.conn, self.folder, "Python", "cv.docx", b"word")
+        self.assertEqual(sorted(p.name for p in (self.folder / "python").iterdir()), ["NAME.docx", "NAME.pdf"])
+        self.assertEqual((self.folder / "python" / "NAME.pdf").read_bytes(), b"two")
+        node = resumes.upload(self.conn, self.folder, "Node.js", "node.pdf", b"node")
+        self.assertFalse(node["is_default"])
+        tracks = resumes.listing(self.conn, self.folder)
+        self.assertEqual([(t["track"], [f["ext"] for f in t["files"]]) for t in tracks], [("python", ["pdf", "docx"]), ("nodejs", ["pdf"])])
+        self.assertEqual(resumes.file_of(self.conn, self.folder, python["id"]).name, "NAME.pdf")
+        self.assertEqual(resumes.file_of(self.conn, self.folder, python["id"], "docx").name, "NAME.docx")
+        for bad in (("Python", "cv.exe", b"x"), ("Python", "cv.pdf", b"")):
+            with self.assertRaises(db.ValidationError):
+                resumes.upload(self.conn, self.folder, *bad)
 
-    def test_remove_moves_file_and_unlinks_applications(self):
-        a = resumes.upload(self.conn, self.folder, "a.pdf", b"a")
-        b = resumes.upload(self.conn, self.folder, "b.pdf", b"b")
+    def test_renaming_the_standard_name_renames_files(self):
+        resumes.set_standard_name(self.conn, self.folder, "old")
+        resumes.upload(self.conn, self.folder, "Python", "a.pdf", b"a")
+        (self.folder / "python" / "notes.txt").write_text("mine")
+        resumes.set_standard_name(self.conn, self.folder, "muhammad_hammad_hassan_resume")
+        self.assertEqual(sorted(p.name for p in (self.folder / "python").iterdir()), ["muhammad_hammad_hassan_resume.pdf", "notes.txt"])
+        self.assertEqual(db.all_rows(self.conn, "profile")[0]["resume_filename"], "muhammad_hammad_hassan_resume")
+
+    def test_folders_become_tracks_and_delete(self):
+        resumes.set_standard_name(self.conn, self.folder, "cv")
+        (self.folder / "go").mkdir()
+        (self.folder / "go" / "cv.pdf").write_bytes(b"go")
+        (self.folder / "removed").mkdir()
+        (self.folder / "loose.pdf").write_bytes(b"flat files are ignored")
+        resumes.sync(self.conn, self.folder)
+        resumes.sync(self.conn, self.folder)
+        self.assertEqual([t["track"] for t in resumes.listing(self.conn, self.folder)], ["go"])
+        go = resumes.upload(self.conn, self.folder, "Go", "x.pdf", b"go2")
+        rust = resumes.upload(self.conn, self.folder, "Rust", "x.pdf", b"rust")
         cid = db.insert(self.conn, "companies", {"name": "Acme"})["id"]
-        app = db.insert(self.conn, "applications", {"company_id": cid, "resume_id": a["id"]})
-        self.assertEqual(app["resume_id"], a["id"])
-        resumes.remove(self.conn, self.folder, a["id"])
-        self.assertTrue((self.folder / "removed" / "a.pdf").exists())
-        self.assertIsNone(db.get(self.conn, "applications", app["id"])["resume_id"])
-        self.assertTrue(db.get(self.conn, "resumes", b["id"])["is_default"])  # the default moves on
-        resumes.sync(self.conn, self.folder)
-        self.assertEqual([r["filename"] for r in db.all_rows(self.conn, "resumes")], ["b.pdf"])
+        app = db.insert(self.conn, "applications", {"company_id": cid, "resume_id": go["id"]})
+        (self.folder / "go" / "keep.txt").write_text("mine")
         with self.assertRaises(db.ValidationError):
-            db.update(self.conn, "applications", app["id"], {"resume_id": 999})
+            resumes.remove(self.conn, self.folder, go["id"])  # won't delete files it didn't make
+        (self.folder / "go" / "keep.txt").unlink()
+        resumes.remove(self.conn, self.folder, go["id"])
+        self.assertFalse((self.folder / "go").exists())
+        self.assertIsNone(db.get(self.conn, "applications", app["id"])["resume_id"])
+        self.assertTrue(db.get(self.conn, "resumes", rust["id"])["is_default"])  # the default moves on
+        resumes.delete_file(self.conn, self.folder, rust["id"], "pdf")
+        self.assertEqual(resumes.listing(self.conn, self.folder)[0]["files"], [])
+        with self.assertRaises(db.ValidationError):
+            resumes.file_of(self.conn, self.folder, rust["id"])
+        with self.assertRaises(db.ValidationError):
+            db.insert(self.conn, "resumes", {"label": "no folder"})
+
+    def test_first_layout_is_migrated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "v3.sqlite3"
+            conn = db.connect(path, init=True)
+            with conn:
+                conn.execute("DROP TABLE resumes")
+                conn.execute(db.SCHEMA[db.SCHEMA.index("CREATE TABLE IF NOT EXISTS resumes"):].replace("track ", "filename "))
+                conn.execute("INSERT INTO resumes (filename, created_at, updated_at) VALUES ('old.pdf', 'x', 'x')")
+            conn.close()
+            conn = db.connect(path, init=True)
+            self.assertEqual(db.all_rows(conn, "resumes"), [])
+            self.assertIn("track", {r["name"] for r in conn.execute("PRAGMA table_info(resumes)")})
+            conn.close()
 
 
 class ServerTests(unittest.TestCase):
@@ -346,28 +384,36 @@ class ServerTests(unittest.TestCase):
         self.assertEqual((data["companies"], data["applications"], data["events"]), ([], [], []))
 
     def test_resumes(self):
-        req = urllib.request.Request(self.base + "/api/resumes/upload?name=Node%20CV.pdf", method="POST", data=b"%PDF-1.4 node",
-                                     headers={"X-Token": self.srv.token})
-        with urllib.request.urlopen(req) as res:
-            row = json.loads(res.read())
-        self.assertTrue((self.resumes / "Node CV.pdf").exists())
-        (self.resumes / "python.docx").write_bytes(b"docx")
+        def upload(track, name, data):
+            req = urllib.request.Request(f"{self.base}/api/resumes/upload?track={track}&name={name}", method="POST",
+                                         data=data, headers={"X-Token": self.srv.token})
+            with urllib.request.urlopen(req) as res:
+                return json.loads(res.read())
+
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            upload("Python", "cv.pdf", b"x")
+        self.assertEqual(ctx.exception.code, 400)  # needs a file name first
+        self.assertEqual(self.call("POST", "/api/resumes/filename", {"name": "hassan_resume"})["name"], "hassan_resume")
+        row = upload("Node.js", "Node%20CV.pdf", b"%PDF-1.4 node")
+        upload("Node.js", "cv.docx", b"word")
+        self.assertTrue((self.resumes / "nodejs" / "hassan_resume.pdf").exists())
         data = self.call("GET", "/api/data")
-        self.assertEqual(sorted(r["filename"] for r in data["resumes"]), ["Node CV.pdf", "python.docx"])
-        self.assertEqual(data["resumes_dir"], str(self.resumes))
+        self.assertEqual([(r["label"], [f["ext"] for f in r["files"]]) for r in data["resumes"]], [("Node.js", ["pdf", "docx"])])
+        self.assertEqual(data["profile"][0]["resume_filename"], "hassan_resume")
         with urllib.request.urlopen(f"{self.base}/resume/{row['id']}?t={self.srv.token}") as res:
             self.assertEqual((res.read(), res.headers["Content-Type"]), (b"%PDF-1.4 node", "application/pdf"))
+        with urllib.request.urlopen(f"{self.base}/resume/{row['id']}?ext=docx&t={self.srv.token}") as res:
+            self.assertEqual(res.read(), b"word")
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(f"{self.base}/resume/{row['id']}")
         self.assertEqual(ctx.exception.code, 403)
-        self.assertEqual(self.call("PATCH", f"/api/resumes/{row['id']}", {"label": "Node.js"})["label"], "Node.js")
+        self.call("DELETE", f"/api/resumes/{row['id']}/file?ext=docx")
+        self.assertFalse((self.resumes / "nodejs" / "hassan_resume.docx").exists())
         out = self.call("POST", "/api/quick-add", {"company": {"name": "Resume Co"}, "application": {"position": "Dev", "resume_id": row["id"]}})
-        self.assertEqual(self.call("GET", "/api/data")["applications"][-1]["resume_id"], row["id"])
         self.call("DELETE", f"/api/resumes/{row['id']}")
-        self.assertTrue((self.resumes / "removed" / "Node CV.pdf").exists())
+        self.assertFalse((self.resumes / "nodejs").exists())
         data = self.call("GET", "/api/data")
-        self.assertEqual([r["filename"] for r in data["resumes"]], ["python.docx"])
-        self.assertIsNone(data["applications"][-1]["resume_id"])
+        self.assertEqual((data["resumes"], data["applications"][-1]["resume_id"]), ([], None))
         self.call("DELETE", f"/api/companies/{out['company_id']}")
 
     def test_bad_host_rejected(self):

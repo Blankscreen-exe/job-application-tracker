@@ -1,6 +1,6 @@
 """SQLite storage: companies, their applications, the people you talk to and a log of events,
-plus a little about you (your profile and portfolio projects) for writing messages, and the resume
-versions you send (the files themselves live in a folder; see resumes.py).
+plus a little about you (your profile and portfolio projects) for writing messages, and your resume
+tracks, such as Python and Node.js (the files themselves live in a folder; see resumes.py).
 
 Functions here never commit; callers wrap their work in `with conn:` so a request is all-or-nothing.
 """
@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS profile (
     about      TEXT NOT NULL DEFAULT '',
     skills     TEXT NOT NULL DEFAULT '',
     links      TEXT NOT NULL DEFAULT '',
+    resume_filename TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -95,7 +96,7 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 CREATE TABLE IF NOT EXISTS resumes (
     id         INTEGER PRIMARY KEY,
-    filename   TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    track      TEXT NOT NULL UNIQUE COLLATE NOCASE,
     label      TEXT NOT NULL DEFAULT '',
     notes      TEXT NOT NULL DEFAULT '',
     is_default INTEGER NOT NULL DEFAULT 0,
@@ -103,12 +104,13 @@ CREATE TABLE IF NOT EXISTS resumes (
     updated_at TEXT NOT NULL
 );
 """
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 # Columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them to an old database.
 ADDED_COLUMNS = {
     "applications": {"told": "TEXT NOT NULL DEFAULT '[]'",
                      "resume_id": "INTEGER REFERENCES resumes(id) ON DELETE SET NULL"},
     "events": {"remind": "INTEGER NOT NULL DEFAULT 0"},
+    "profile": {"resume_filename": "TEXT NOT NULL DEFAULT ''"},
 }
 
 # Editable fields per table and how each is checked. Anything not listed (id, timestamps) is ignored.
@@ -136,7 +138,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "name": "project", "description": "text", "tools": "tools", "repo_url": "text", "demo_url": "text",
         "role": "text", "dates": "text", "results": "text",
     },
-    # The filename is set when a file is found or uploaded (resumes.py), never edited here.
+    # A resume track. Its folder name is set when it is found or uploaded to (resumes.py), never edited here.
     "resumes": {"label": "text", "notes": "text", "is_default": "bool"},
 }
 TABLES = tuple(FIELDS)
@@ -180,6 +182,10 @@ def connect(path: Path | str, *, init: bool = False) -> sqlite3.Connection:
 def migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to date. Safe to run every time."""
     with conn:
+        # The first resume layout kept loose files, one row each. Tracks replace them; the files stay on disk.
+        if "filename" in {row["name"] for row in conn.execute("PRAGMA table_info(resumes)")}:
+            conn.execute("DELETE FROM resumes")
+            conn.execute("ALTER TABLE resumes RENAME COLUMN filename TO track")
         for table, columns in ADDED_COLUMNS.items():
             have = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
             for column, decl in columns.items():
@@ -318,7 +324,7 @@ def insert(conn: sqlite3.Connection, table: str, data: dict) -> dict:
     if table == "profile":
         raise ValidationError("There is only one profile; update it instead")
     if table == "resumes":
-        raise ValidationError("Upload a resume file instead")
+        raise ValidationError("Upload a resume to a track instead")
     values = clean(table, data)
     for key, kind in FIELDS[table].items():
         if kind in REQUIRED and key not in values:
