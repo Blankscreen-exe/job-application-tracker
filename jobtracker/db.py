@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS profile (
     skills     TEXT NOT NULL DEFAULT '',
     links      TEXT NOT NULL DEFAULT '',
     resume_filename TEXT NOT NULL DEFAULT '',
+    details    TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -104,13 +105,14 @@ CREATE TABLE IF NOT EXISTS resumes (
     updated_at TEXT NOT NULL
 );
 """
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 # Columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them to an old database.
 ADDED_COLUMNS = {
     "applications": {"told": "TEXT NOT NULL DEFAULT '[]'",
                      "resume_id": "INTEGER REFERENCES resumes(id) ON DELETE SET NULL"},
     "events": {"remind": "INTEGER NOT NULL DEFAULT 0"},
-    "profile": {"resume_filename": "TEXT NOT NULL DEFAULT ''"},
+    "profile": {"resume_filename": "TEXT NOT NULL DEFAULT ''",
+                "details": "TEXT NOT NULL DEFAULT '[]'"},
 }
 
 # Editable fields per table and how each is checked. Anything not listed (id, timestamps) is ignored.
@@ -133,6 +135,7 @@ FIELDS: dict[str, dict[str, str]] = {
     },
     "profile": {
         "name": "text", "headline": "text", "location": "text", "about": "text", "skills": "tools", "links": "text",
+        "details": "pairs",  # form details (First name, Postcode...) to copy into job forms
     },
     "projects": {
         "name": "project", "description": "text", "tools": "tools", "repo_url": "text", "demo_url": "text",
@@ -208,7 +211,7 @@ def _coerce(kind: str, key: str, value):
             return int(value.strip().lower() in TRUE_WORDS)
         return int(bool(value))
     if kind == "pairs":
-        return json.dumps(parse_pairs(value), ensure_ascii=False)
+        return json.dumps(parse_pairs(value, key), ensure_ascii=False)
     text = "" if value is None else str(value).strip()
     if kind in REQUIRED:
         if not text:
@@ -254,7 +257,7 @@ def join_tools(text: str) -> str:
     return ", ".join(out)
 
 
-def parse_pairs(value) -> list[dict]:
+def parse_pairs(value, key: str = "told") -> list[dict]:
     """Label/value rows ("Salary": "will discuss in interview"), from a list or its JSON text.
 
     Rows with neither a label nor a value are dropped.
@@ -263,9 +266,9 @@ def parse_pairs(value) -> list[dict]:
         try:
             value = json.loads(value or "[]")
         except json.JSONDecodeError:
-            raise ValidationError("told must be a list of label/value rows") from None
+            raise ValidationError(f"{key} must be a list of label/value rows") from None
     if not isinstance(value, list):
-        raise ValidationError("told must be a list of label/value rows")
+        raise ValidationError(f"{key} must be a list of label/value rows")
     out = []
     for item in value:
         if isinstance(item, dict):
@@ -273,7 +276,7 @@ def parse_pairs(value) -> list[dict]:
         elif isinstance(item, (list, tuple)) and len(item) == 2:
             label, text = item
         else:
-            raise ValidationError("told must be a list of label/value rows")
+            raise ValidationError(f"{key} must be a list of label/value rows")
         label, text = str(label or "").strip(), str(text or "").strip()
         if label or text:
             out.append({"label": label, "value": text})
@@ -293,7 +296,7 @@ def _row(table: str, row: sqlite3.Row | None) -> dict | None:
         if kind == "bool":
             out[key] = bool(out[key])
         elif kind == "pairs":
-            out[key] = parse_pairs(out[key])
+            out[key] = parse_pairs(out[key], key)
     return out
 
 
